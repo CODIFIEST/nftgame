@@ -8,9 +8,10 @@
     import HighScoreList from "./HighScoreList.svelte";
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
+    import playerName from "../src/stores/playername";
     const imgURL = $playerImage;
     async function getHighScores() {
-        const result = await axios.get("https://nftgame-dusky.vercel.app:3888/scores");
+        const result = await axios.get("http://localhost:3888/scores");
         return result.data;
     }
 
@@ -37,7 +38,7 @@
 
     var player;
     // var imgURL;
-
+    var player1name;
     var platforms;
     var cursors;
     var stars;
@@ -76,6 +77,7 @@
         platforms.create(50, 670, "ground");
         platforms.create(1050, 250, "ground");
         platforms.create(750, 420, "ground");
+        player1name = this.add.text(16, 100, `Player1: ${$playerName}`)
         scoreText = this.add.text(16, 16, "score: 0", {
             fontSize: "32px",
             fill: "#000",
@@ -156,11 +158,11 @@
         // };
         // scores.push(currentScore);
         async function updateScores() {
-            const result = await axios.post("https://nftgame-dusky.vercel.app:3888/scores", {
+            const result = await axios.post("http://localhost:3888/scores", {
                 token: $player1nft.tokenAddress,
                 imageURL: $player1nft.imageURL,
                 score: score,
-                playerName: "you don't get a name lol",
+                playerName: $playerName,
             });
         }
         updateScores();

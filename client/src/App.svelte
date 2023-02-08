@@ -3,15 +3,27 @@
     import Game from "../components/Game.svelte";
     import Hero from "../components/Hero.svelte";
     import HighScoreList from "../components/HighScoreList.svelte";
-    import VideoGameForm from "../components/VideoGameForm.svelte";
-    import VideoGameList from "../components/VideoGameList.svelte";
-    import { account } from "./stores/account";
+     import { account } from "./stores/account";
     import player1 from "./stores/player1";
     import { playerImage } from "./stores/playerImage";
+    import playerName from "./stores/playername";
     let viewForm:boolean = true
     function toggleDisplay() {
-  viewForm = !viewForm;
-}
+        viewForm = !viewForm;
+
+    }
+    function setPlayerName(){
+      player1.set({playerName:$playerName,
+      token:"",
+      score:0,
+      imageURL:""
+    })
+    }
+    player1.set({playerName:"",
+      token:"",
+      score:0,
+      imageURL:""
+    })
 
 </script>
 
@@ -25,6 +37,10 @@
   <!-- <Resizer /> -->
 <Game/>
 </div>
+{:else if !$player1.playerName}
+<input bind:value={$playerName} type="text" placeholder="Put your name here">
+<button on:click = {()=>setPlayerName()}>Let's Play!</button>
+<HighScoreList />
 
 {:else}
 <Hero />
