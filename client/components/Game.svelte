@@ -10,7 +10,7 @@
     import player1nft from "../src/stores/player1nft";
     const imgURL = $playerImage;
     async function getHighScores() {
-        const result = await axios.get("https://nftgame-dusky.vercel.app/:3888/scores");
+        const result = await axios.get("https://nftgame-dusky.vercel.app:3888/scores");
         return result.data;
     }
 
@@ -156,7 +156,7 @@
         // };
         // scores.push(currentScore);
         async function updateScores() {
-            const result = await axios.post("https://nftgame-dusky.vercel.app/:3888/scores", {
+            const result = await axios.post("https://nftgame-dusky.vercel.app:3888/scores", {
                 token: $player1nft.tokenAddress,
                 imageURL: $player1nft.imageURL,
                 score: score,
