@@ -2,7 +2,7 @@ import express from "express"
 import fs from "fs"
 import cors from "cors"
 import validateUserInput from "./validateUserInput";
-import { PlayerScore } from "./domain/playerscore";
+import { PlayerScore } from "../client/src/domain/playerscore";
 
 const app = express();
 app.use(express.json());
