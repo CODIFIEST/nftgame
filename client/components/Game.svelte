@@ -9,7 +9,7 @@
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
     import playerName from "../src/stores/playername";
-    playerImage.set("./sadcanto.png");  // use this if we don't want to use the NFT image
+    // playerImage.set("./sadcanto.png");  // use this if we don't want to use the NFT image
     const imgURL = $playerImage;
     async function getHighScores() {
         const result = await axios.get("http://localhost:3888/scores");
@@ -57,14 +57,15 @@
         this.load.image("ground", "./platform.png");
         this.load.image("star", "./star.png");
         this.load.image("bomb", "./bomb.png");
-        this.load.image("dude", imgURL, {
-            frameWidth: 32,
-            frameHeight: 48,
+        this.load.spritesheet("dude", imgURL, {
+            frameWidth: 180,
+            frameHeight: 270,
         });
         // this.load.Image("dude", $playerImage);
         // { frameWidth: 32, frameHeight: 48 }
         // console.log(`${$playerImage}playerImage`);
         // console.log($playerImage)
+        
     }
 
     function create() {
@@ -107,36 +108,36 @@
             child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
         });
 // this part blanked out for anims 
-        // this.anims.create({
-        //     key: "left",
-        //     frames: this.anims.generateFrameNumbers("dude", {
-        //         start: 0,
-        //         end: 3,
-        //     }),
-        //     frameRate: 10,
-        //     repeat: -1,
-        // });
+        this.anims.create({
+            key: "left",
+            frames: this.anims.generateFrameNumbers("dude", {
+                start: 8,
+                end: 8,
+            }),
+            frameRate: 10,
+            repeat: -1,
+        });
 
-        // this.anims.create({
-        //     key: "turn",
-        //     frames: [
-        //         {
-        //             key: "dude",
-        //             frame: 4,
-        //         },
-        //     ],
-        //     frameRate: 20,
-        // });
+        this.anims.create({
+            key: "turn",
+            frames: [
+                {
+                    key: "dude",
+                    frame: 9,
+                },
+            ],
+            frameRate: 20,
+        });
 
-        // this.anims.create({
-        //     key: "right",
-        //     frames: this.anims.generateFrameNumbers("dude", {
-        //         start: 5,
-        //         end: 8,
-        //     }),
-        //     frameRate: 10,
-        //     repeat: -1,
-        // });
+        this.anims.create({
+            key: "right",
+            frames: this.anims.generateFrameNumbers("dude", {
+                start: 10,
+                end: 10,
+            }),
+            frameRate: 10,
+            repeat: -1,
+        });
         // player.body.setGravityY(400); this did not override default gravity
         // this.physics.add.collider(player, platforms);
         cursors = this.input.keyboard.createCursorKeys();

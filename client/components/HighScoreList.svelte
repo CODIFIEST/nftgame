@@ -24,7 +24,7 @@
     <div>
         <br> Name: {p1score.playerName}
         <br> Score: {p1score.score}
-        <br> Token: {p1score.token}
+        <!-- <br> Token: {p1score.token} -->
         <br> <img src={p1score.imageURL} height="50px" width="50px" alt="super panda">
     </div>
     
