@@ -13,7 +13,10 @@
         scores = await getHighScores();
           // sort by value
         scores.sort((a,b)=> b.score - a.score)
-        scores.length = 5;
+        if (scores.length > 5){
+            scores.length = 5;
+        }
+        
         highscores.set(scores)
     })
 </script>

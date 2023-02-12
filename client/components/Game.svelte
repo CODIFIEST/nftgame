@@ -9,6 +9,7 @@
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
     import playerName from "../src/stores/playername";
+    playerImage.set("./sadcanto.png");  // use this if we don't want to use the NFT image
     const imgURL = $playerImage;
     async function getHighScores() {
         const result = await axios.get("http://localhost:3888/scores");
@@ -20,7 +21,7 @@
     console.log(scores);
     var config = {
         type: Phaser.AUTO,
-        width: 1800,
+        width: 1400,
         height: 1000,
         physics: {
             default: "arcade",
@@ -46,17 +47,19 @@
     var scoreText;
     var highScoreText;
     var bombs;
+    let level = 1;
+    var displayLevel;
     var game = new Phaser.Game(config);
 
     function preload() {
         // console.log(`preload `+ {playerImage})
-        this.load.image("sky", "./sky.png");
+        this.load.image("sky", "./newsky.png");
         this.load.image("ground", "./platform.png");
         this.load.image("star", "./star.png");
         this.load.image("bomb", "./bomb.png");
-        this.load.spritesheet("dude", imgURL, {
-            frameWidth: 280,
-            frameHeight: 366,
+        this.load.image("dude", imgURL, {
+            frameWidth: 32,
+            frameHeight: 48,
         });
         // this.load.Image("dude", $playerImage);
         // { frameWidth: 32, frameHeight: 48 }
@@ -68,23 +71,24 @@
         // console.log(`create `);
         // // console.log({playerImage})
         // imgURL = $playerImage;
-        this.add.image(400, 300, "sky").setScale(4);
+        this.add.image(700, 500, "sky").setScale(1);
 
         platforms = this.physics.add.staticGroup();
 
-        platforms.create(900, 1000, "ground").setScale(4).refreshBody();
+        platforms.create(700, 1050, "ground").setScale(4).refreshBody();
 
-        platforms.create(50, 670, "ground");
-        platforms.create(1050, 250, "ground");
+        platforms.create(50, 700, "ground");
+        platforms.create(900, 700, "ground");
         platforms.create(750, 420, "ground");
-        player1name = this.add.text(16, 100, `Player1: ${$playerName}`)
-        scoreText = this.add.text(16, 16, "score: 0", {
+        player1name = this.add.text(16, 4, `Player1: ${$playerName}`,{ fontSize: "32px"});
+        displayLevel = this.add.text(16,36, `Level: ${level} of 10`, { fontSize: "32px"});
+        scoreText = this.add.text(520, 4, "score: 0", {
             fontSize: "32px",
-            fill: "#000",
+            // fill: "#000",
         });
-        highScoreText = this.add.text(16, 48, `High score: ${$highscores[0].score}`, {
+        highScoreText = this.add.text(520, 36, `High score: ${$highscores[0].score}`, {
             fontSize: "32px",
-            fill: "#000",
+            // fill: "#000",
         });
 
         // this.load.Image("dude", imgURL);
@@ -102,37 +106,37 @@
         stars.children.iterate((child) => {
             child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
         });
+// this part blanked out for anims 
+        // this.anims.create({
+        //     key: "left",
+        //     frames: this.anims.generateFrameNumbers("dude", {
+        //         start: 0,
+        //         end: 3,
+        //     }),
+        //     frameRate: 10,
+        //     repeat: -1,
+        // });
 
-        this.anims.create({
-            key: "left",
-            frames: this.anims.generateFrameNumbers("dude", {
-                start: 0,
-                end: 3,
-            }),
-            frameRate: 10,
-            repeat: -1,
-        });
+        // this.anims.create({
+        //     key: "turn",
+        //     frames: [
+        //         {
+        //             key: "dude",
+        //             frame: 4,
+        //         },
+        //     ],
+        //     frameRate: 20,
+        // });
 
-        this.anims.create({
-            key: "turn",
-            frames: [
-                {
-                    key: "dude",
-                    frame: 4,
-                },
-            ],
-            frameRate: 20,
-        });
-
-        this.anims.create({
-            key: "right",
-            frames: this.anims.generateFrameNumbers("dude", {
-                start: 5,
-                end: 8,
-            }),
-            frameRate: 10,
-            repeat: -1,
-        });
+        // this.anims.create({
+        //     key: "right",
+        //     frames: this.anims.generateFrameNumbers("dude", {
+        //         start: 5,
+        //         end: 8,
+        //     }),
+        //     frameRate: 10,
+        //     repeat: -1,
+        // });
         // player.body.setGravityY(400); this did not override default gravity
         // this.physics.add.collider(player, platforms);
         cursors = this.input.keyboard.createCursorKeys();
@@ -198,6 +202,8 @@
         highScoreText.setText("High Score: " + score);
         }
         if (stars.countActive(true) === 0) {
+            level ++;
+            displayLevel.setText(`Level: ${level} of 10`)
             stars.children.iterate((child) => {
                 child.enableBody(true, child.x, 0, true, true);
             });
