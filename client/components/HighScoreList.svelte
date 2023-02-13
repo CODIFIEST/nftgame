@@ -4,7 +4,7 @@
     import highscores from "../src/stores/highscores";
     let scores = [];
     async function getHighScores() {
-        const result = await axios.get('http://localhost:3888/scores');
+        const result = await axios.get('https://nftgame-server.vercel.app/scores');
         console.log('results', result.data)
         return result.data
         

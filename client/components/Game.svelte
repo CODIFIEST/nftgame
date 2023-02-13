@@ -12,7 +12,7 @@
     // playerImage.set("./sadcanto.png");  // use this if we don't want to use the NFT image
     const imgURL = $playerImage;
     async function getHighScores() {
-        const result = await axios.get("http://localhost:3888/scores");
+        const result = await axios.get("https://nftgame-server.vercel.app/scores");
         return result.data;
     }
 
@@ -163,7 +163,7 @@
         // };
         // scores.push(currentScore);
         async function updateScores() {
-            const result = await axios.post("http://localhost:3888/scores", {
+            const result = await axios.post("https://nftgame-server.vercel.app/scores", {
                 token: $player1nft.tokenAddress,
                 imageURL: $player1nft.imageURL,
                 score: score,
