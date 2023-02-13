@@ -1,12 +1,12 @@
 import express from "express"
-import fs from "fs"
+// import fs from "fs"
 import cors from "cors"
-import validateUserInput from "./validateUserInput";
-import { PlayerScore } from "../client/src/domain/playerscore";
+import validateUserInput from "../validateUserInput";
+// import { PlayerScore } from "../../client/src/domain/playerscore";
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore,deleteDoc, setDoc, doc, getDoc, getDocs, collection, addDoc } from "firebase/firestore";
-import { HighScore } from "./domain/highscore";
+import { HighScore } from "../domain/highscore";
 // import * as dotenv from 'dotenv';
 // dotenv.config();
 // TODO: Add SDKs for Firebase products that you want to use
