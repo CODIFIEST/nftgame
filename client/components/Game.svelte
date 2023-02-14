@@ -1,7 +1,7 @@
 <script lang="ts">
     import axios from "axios";
-    import player1 from "../src/stores/player1";
-    import fs from "fs";
+    // import player1 from "../src/stores/player1";
+    // import fs from "fs";
     import * as Phaser from "phaser";
     import type { PlayerScore } from "../src/domain/playerscore";
     import { playerImage } from "../src/stores/playerImage";
