@@ -27,23 +27,23 @@
                 src={transformURLs(nft.imageURL)}
                 alt={nft.title}
                 on:click={() => {
-                    // resize the image and save it here for the game TODO this is broken now
-                    // Thumbo.init().then(async () => {
-                    //     Thumbo.thumbnailFromUrl(
-                    //         nft.imageURL,
-                    //         Thumbo.ImageFormat.Png,
-                    //         270,
-                    //         200
-                    //     ).then((thumbnailBuffer) => {
-                    //         const daPlayer = new Blob([
-                    //             thumbnailBuffer,
-                    //         ]).toString();
-                    //         console.log(daPlayer)
-                    //         playerImage.set(daPlayer);
-                    //         console.log($playerImage);
-                    //     });
-                    // });
-                    playerImage.set(nft.imageURL)
+//                     resize the image and save it here for the game TODO this is broken now
+                     Thumbo.init().then(async () => {
+                         Thumbo.thumbnailFromUrl(
+                             `${nft.imageURL}`,
+                             Thumbo.ImageFormat.Png,
+                             270,
+                             200
+                         ).then(async (thumbnailBuffer) => {
+						const daPlayer = await URL.createObjectURL( new Blob([thumbnailBuffer])
+						  );
+//                             const daPlayer = new Blob([thumbnailBuffer,]).toString();
+                             console.log(daPlayer)
+                             playerImage.set(daPlayer);
+                             console.log('WHAT IS THE PLAYERIMAGE', $playerImage);
+                         });
+                     });
+//                    playerImage.set(nft.imageURL)
                     player1nft.set(nft);
                     // console.log(playerImage)
                     console.log("NFT.svelte playerImage");

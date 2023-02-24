@@ -57,7 +57,7 @@
         this.load.image("ground", "./platform.png");
         this.load.image("star", "./star.png");
         this.load.image("bomb", "./bomb.png");
-        this.load.spritesheet("dude", imgURL, {
+        this.load.image("dude", imgURL, {
             frameWidth: 180,
             frameHeight: 270,
         });
@@ -108,36 +108,36 @@
             child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
         });
 // this part blanked out for anims 
-        this.anims.create({
-            key: "left",
-            frames: this.anims.generateFrameNumbers("dude", {
-                start: 8,
-                end: 8,
-            }),
-            frameRate: 10,
-            repeat: -1,
-        });
-
-        this.anims.create({
-            key: "turn",
-            frames: [
-                {
-                    key: "dude",
-                    frame: 9,
-                },
-            ],
-            frameRate: 20,
-        });
-
-        this.anims.create({
-            key: "right",
-            frames: this.anims.generateFrameNumbers("dude", {
-                start: 10,
-                end: 10,
-            }),
-            frameRate: 10,
-            repeat: -1,
-        });
+//        this.anims.create({
+//            key: "left",
+//            frames: this.anims.generateFrameNumbers("dude", {
+//                start: 8,
+//                end: 8,
+//            }),
+//            frameRate: 10,
+//            repeat: -1,
+//        });
+//
+//        this.anims.create({
+//            key: "turn",
+//            frames: [
+//                {
+//                    key: "dude",
+//                    frame: 9,
+//                },
+//            ],
+//            frameRate: 20,
+//        });
+//
+//        this.anims.create({
+//            key: "right",
+//            frames: this.anims.generateFrameNumbers("dude", {
+//                start: 10,
+//                end: 10,
+//            }),
+//            frameRate: 10,
+//            repeat: -1,
+//        });
         // player.body.setGravityY(400); this did not override default gravity
         // this.physics.add.collider(player, platforms);
         cursors = this.input.keyboard.createCursorKeys();
