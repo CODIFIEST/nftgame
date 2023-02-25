@@ -1,3 +1,4 @@
+
 <script lang="ts">
     import axios from "axios";
     // import player1 from "../src/stores/player1";
@@ -5,10 +6,11 @@
     import * as Phaser from "phaser";
     import type { PlayerScore } from "../src/domain/playerscore";
     import { playerImage } from "../src/stores/playerImage";
-    import HighScoreList from "./HighScoreList.svelte";
+    // import HighScoreList from "../../components/HighScoreList.svelte";
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
     import playerName from "../src/stores/playername";
+    import { pop, push } from "svelte-spa-router";
     // playerImage.set("./sadcanto.png");  // use this if we don't want to use the NFT image
     const imgURL = $playerImage;
     async function getHighScores() {
@@ -16,9 +18,10 @@
         return result.data;
     }
 
-    let scores: PlayerScore[] = getHighScores() as any as PlayerScore[];
+    // let scores: PlayerScore[] = getHighScores() as any as PlayerScore[];
 
-    console.log(scores);
+    // console.log(";am");
+
     var config = {
         type: Phaser.AUTO,
         width: 1400,
@@ -154,7 +157,7 @@
         console.log(score);
         this.physics.pause();
         player.setTint(0xff0000);
-        player.anims.play("turn");
+        // player.anims.play("turn");
         // let currentScore: PlayerScore = {
         //     token: $player1.token,
         //     imageURL: $player1.imageURL,
@@ -173,7 +176,7 @@
         updateScores();
 
         // console.log(currentScore);
-        console.log(scores);
+        // console.log(scores);
         if (score > $highscores[0].score) {
             console.log("High score!");
             console.log(score, " noice.");
@@ -187,9 +190,13 @@
 
         let gameOver = true;
         //do a modal for game restart here ##TODO
-        setTimeout(() => {
+        setTimeout(async() => {
+            await push('/');
             location.reload();
-        }, 6000);
+         
+            
+
+        }, 5000);
      
 
     }
@@ -223,13 +230,13 @@
         // console.log(`update ${$playerImage}`);
         if (cursors.left.isDown) {
             player.setVelocityX(-160);
-            player.anims.play("left", true);
+            // player.anims.play("left", true);
         } else if (cursors.right.isDown) {
             player.setVelocityX(160);
-            player.anims.play("right", true);
+            // player.anims.play("right", true);
         } else {
             player.setVelocityX(0);
-            player.anims.play("turn");
+            // player.anims.play("turn");
         }
         if (cursors.up.isDown && player.body.touching.down) {
             player.setVelocityY(-430);
@@ -237,4 +244,4 @@
     }
 </script>
 
-<HighScoreList />
+

@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { NFT } from "../../server/domain/nft";
-    import nfts from "../src/stores/nfts";
-    import Nft from "./NFT.svelte";
+    import type { NFT } from "../../../server/domain/nft";
+    import nfts from "../stores/nfts";
+    import Nft from "../../components/NFT.svelte";
  
 </script>
 

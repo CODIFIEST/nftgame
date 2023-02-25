@@ -1,61 +1,56 @@
 <script lang="ts">
-    import DisplayNfTs from "../components/DisplayNFTs.svelte";
-    import Game from "../components/Game.svelte";
+    import Router from 'svelte-spa-router/Router.svelte'
+    import DisplayNfTs from "./pages/DisplayNFTs.svelte";
+
     import Hero from "../components/Hero.svelte";
     import HighScoreList from "../components/HighScoreList.svelte";
+
+    import Home from "./pages/Home.svelte";
+    import LoginPage from "./pages/LoginPage.svelte";
      import { account } from "./stores/account";
     import player1 from "./stores/player1";
     import { playerImage } from "./stores/playerImage";
     import playerName from "./stores/playername";
+    import GameOn from './pages/GameOn.svelte';
+    import Navbar from '../components/Navbar.svelte';
     let viewForm:boolean = true
     function toggleDisplay() {
         viewForm = !viewForm;
 
     }
-    function setPlayerName(){
-      player1.set({playerName:$playerName,
-      token:"",
-      score:0,
-      imageURL:""
-    })
-    }
-    player1.set({playerName:"",
-      token:"",
-      score:0,
-      imageURL:""
-    })
 
+    const routes = {
+    // Exact path
+    "/": Home,
+    // route to create a user to be able to log in
+    // "/register": CreateUser,
+    // Using named parameters, with last being optional
+    "/login": LoginPage,
+
+    // Display all possible characters
+    "/displaychars": DisplayNfTs,
+    //edit only your own user
+    "/game": GameOn,
+
+    // Catch-all
+    // This is optional, but if present it must be the last
+    // "*": NotFound,
+  };
 </script>
 
 <main>
 
-  {#if $account && !$playerImage}
-<!-- {console.log("front page ", $account)} -->
-<DisplayNfTs />
-{:else if $playerImage}
-<div id="bg-image">
-  <!-- <Resizer /> -->
-<Game/>
-</div>
-{:else if !$player1.playerName}
-<input bind:value={$playerName} type="text" placeholder="Put your name here">
-<button on:click = {()=>setPlayerName()}>Let's Play!</button>
-<HighScoreList />
+  <div class="hero flex-auto">
+  
+    <div class="hero-overlay bg-opacity-60" />
+    <div class="hero-content text-center">
+      <div class="max-w-7xl">
+        
+        <!-- <Notifications> -->
+          <Router {routes} />
+        <!-- </Notifications> -->
+      </div>
+    </div>
+  </div>
 
-{:else}
-<Hero />
-<HighScoreList />
-{/if}
-<!-- {if $account && !$player1.imgURL} -->
-
-  <!-- <button on:click={toggleDisplay}>Toggle the Display</button>
-  {#if viewForm} -->
- <!-- <UserForm /> -->
- <!-- <VideoGameForm /> -->
-
- <!-- {:else} -->
- <!-- <HighScoreList /> -->
- <!-- <VideoGameList /> -->
- <!-- <UserList /> -->
- <!-- {/if} -->
 </main>

@@ -6,8 +6,9 @@
     // import transformURLs from "../utils/transformURLs";
     import transformURLs from "../utils/transformURLs";
     import truncateString from "../utils/truncateString";
-    import Game from "./Game.svelte";
+    // import Game from "./Game.svelte";
     import Thumbo, { Transfer } from "thumbo";
+    import { push } from "svelte-spa-router";
     // import truncateString from "../utils/truncateString";
     export let nft: NFT;
 </script>
@@ -26,7 +27,8 @@
             <img
                 src={transformURLs(nft.imageURL)}
                 alt={nft.title}
-                on:click={() => {
+                on:click={async () => {
+                     player1nft.set(nft);
 //                     resize the image and save it here for the game TODO this is broken now
                      Thumbo.init().then(async () => {
                          Thumbo.thumbnailFromUrl(
@@ -38,17 +40,21 @@
 						const daPlayer = await URL.createObjectURL( new Blob([thumbnailBuffer])
 						  );
 //                             const daPlayer = new Blob([thumbnailBuffer,]).toString();
-                             console.log(daPlayer)
+                             console.log(daPlayer);
                              playerImage.set(daPlayer);
                              console.log('WHAT IS THE PLAYERIMAGE', $playerImage);
+                             console.log('what is player1nft', $player1nft);
+                             await push('/game')
                          });
                      });
 //                    playerImage.set(nft.imageURL)
-                    player1nft.set(nft);
+                    // player1nft.set(nft);
                     // console.log(playerImage)
                     console.log("NFT.svelte playerImage");
                     console.log($playerImage);
-                    console.log($player1nft);
+                 
+
+                 
                     // document.getElementById('game-container').innerHTML = `<img src='${nft.imageURL}'>`;
                 }}
                 on:keypress={() => {

@@ -3,7 +3,7 @@ import connectPhantom from "../utils/connectPhantom"
 </script>
 
 <div style="display: block;">
-    <h1 class ="darker-backgrond">Connect your wallet to choose your NGMI Panda</h1><br>
+    <h1 class ="card-title text-2xl">Connect your wallet to choose your NGMI Panda</h1><br>
 
 
 <div class="nft-wallets">
@@ -28,9 +28,9 @@ import connectPhantom from "../utils/connectPhantom"
 </div>
 
 <style>
-    h1{
+    /* h1{
         background-color: rgba(0, 0, 0, 0.4);
-    }
+    } */
         .nft-wallets {
         display: flex;
         flex-wrap: wrap;
@@ -43,7 +43,7 @@ import connectPhantom from "../utils/connectPhantom"
     }
     .wallet-image {
 
-        width: 49%
+        width: 75px
       
     }
 
