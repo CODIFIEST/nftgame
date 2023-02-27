@@ -40,7 +40,7 @@
 
 <main>
 
-  <div class="hero flex-auto">
+  <div class="hero min-h-screen" style="background-image: url('https://www.arweave.net/hNN-l4QsOuWIRWwpOn-VDjso2NsGBW3Mg30p18Gs6zQ?ext=png')">
   
     <div class="hero-overlay bg-opacity-60" />
     <div class="hero-content text-center">

@@ -3,6 +3,7 @@
     import { onMount } from "svelte";
     import highscores from "../src/stores/highscores";
     let scores = [];
+    let onthelist=[];
     async function getHighScores() {
         const result = await axios.get('https://nftgame-server.vercel.app/scores');
         console.log('results', result.data)
@@ -10,20 +11,36 @@
         
     }
     onMount(async ()=> {
+    
         scores = await getHighScores();
           // sort by value
         scores.sort((a,b)=> b.score - a.score)
-        if (scores.length > 5){
-            scores.length = 5;
+        // if (scores.length > 10){
+        //     scores.length = 10;
+        // }
+        scores.forEach((score)=>{
+            if (!onthelist.some(e=>e.imageURL=== score.imageURL)){
+                onthelist.push(score)
+            }
+            // console.log('onthelist' , onthelist);
+           
+        });
+        if (onthelist.length > 10) {
+            onthelist.length = 10;
         }
-        
-        highscores.set(scores)
-        console.log(' here are the high score stored in a local array', $highscores)
+        highscores.set(onthelist)
+             console.log(' here are the high score stored in a local array', $highscores)
+// console.log('do scores and onthelist look different?', scores)
+// console.log('onthelist', onthelist)
+
     })
+
 </script>
 <div class="carousel rounded-box">
-{#each scores as p1score }
+<!-- {#each scores as p1score } -->
 
+{#each onthelist as p1score}
+    
 
     <div class="carousel-item rounded-md">
     

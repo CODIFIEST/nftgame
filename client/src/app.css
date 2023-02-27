@@ -6,7 +6,15 @@ body {
   background-color: #868080;
 
 }
-
+canvas {
+  display: block;
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+/* canvas {   display : block;   margin : auto;} */
 /* :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;

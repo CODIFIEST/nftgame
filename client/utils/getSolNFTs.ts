@@ -24,8 +24,8 @@ async function getSolNFTs(address: string): Promise<NFT[]> {
         params: {
             wallet: address,
             omitFields: ["provenance", "traits"],
-            page: 1,
-            perPage: 100,
+            // page: 1,
+            perPage: 80,
         },
     };
     // console.log("address")
