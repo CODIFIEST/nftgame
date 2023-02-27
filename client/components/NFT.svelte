@@ -20,7 +20,7 @@
         {#if nft.description}
             <p>{truncateString(nft.description, 20)}</p>
         {:else}
-            <p>There is no description available</p>
+            <!-- <p>There is no description available</p> -->
         {/if}
         <br />
         <div class="the-NFT">
