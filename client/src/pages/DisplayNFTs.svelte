@@ -11,7 +11,7 @@
         
                     {#each $nfts as nft}
                         {#if nft.imageURL}
-                            <div class="nft-column">
+                            <div class="nft-column  mt-4">
                                 <Nft {nft} />
                             </div>
                         {/if}

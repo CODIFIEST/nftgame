@@ -17,7 +17,7 @@ async function connectPhantom (){
     const SOLNFTs = await getSolNFTs(addy)
     console.log("Sol NFTs")
     console.log(SOLNFTs)
-   nfts.set(SOLNFTs);
+    nfts.set(SOLNFTs);
     // console.log(walletStore)
 }
 export default connectPhantom;

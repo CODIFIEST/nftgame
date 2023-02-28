@@ -10,65 +10,68 @@ import axios from "axios";
 //       VITE_QUICKNODE_APK: string
 //     }
 //   }
-
+let i = 1;
+const domainNFTs: NFT[] = [];
 async function getSolNFTs(address: string): Promise<NFT[]> {
+
     const config = {
         headers: {
             "Content-Type": "application/json",
         },
     };
-    const data = {
+
+    let data = {
         jsonrpc: "2.0",
         id: 1,
         method: "qn_fetchNFTs",
         params: {
             wallet: address,
             omitFields: ["provenance", "traits"],
-            // page: 1,
-            perPage: 80,
+            page: i,
+            perPage: 40,
         },
     };
-    // console.log("address")
-    // console.log(address)
-    //  console.log(import.meta.env.VITE_QUICKNODE_APK)
 
-    const quiknodeNFTs = await axios.post(import.meta.env.VITE_QUICKNODE_APK, data, config)
-    // console.log(import.meta.env.VITE_QUICKNODE_APK)
-    // console.log("solana wallet data")
-    console.log(quiknodeNFTs)
-    const domainNFTs: NFT[] = [];
+    let quiknodeNFTs = await axios.post(import.meta.env.VITE_QUICKNODE_APK, data, config)
+    // let solNFTs = quiknodeNFTs.data.result;
+    while (quiknodeNFTs.data.result.totalPages >= quiknodeNFTs.data.result.pageNumber) {
 
-    quiknodeNFTs.data.result.assets.forEach(nft => {
-
-        if (nft.collectionName === 'NGMIPandas') {
-            const eachNFT: NFT = {
-                title: nft.name,
-                description: nft.description,
-                imageURL: nft.imageUrl,
-                collecctionAddress:nft.collecctionAddress,
-                tokenAddress: nft.tokenAddress,
-                nftType: NFTType.Solana
+        console.log(quiknodeNFTs)
+        quiknodeNFTs.data.result.assets.forEach(nft => {
+            if (nft.collectionName === 'NGMIPandas') {
+                const eachNFT: NFT = {
+                    title: nft.name,
+                    description: nft.description,
+                    imageURL: nft.imageUrl,
+                    collecctionAddress: nft.collecctionAddress,
+                    tokenAddress: nft.tokenAddress,
+                    nftType: NFTType.Solana
+                }
+                domainNFTs.push(eachNFT)
             }
-            domainNFTs.push(eachNFT)
-       
-        }
-        // console.log(domainNFTs)
-    })
-    // axios
-    //     .post("https://nameless-falling-market.solana-devnet.discover.quiknode.pro/1251a9caf84a2d2c0b0b318b1b6ddcd57f326d80/", data, config)
-    //     .then(function (response) {
-    //         // handle success
-    //         // console.log("solana wallet data")
-    //         // console.log(response.data);
+        });
 
-    //     })
-    //     .catch((err) => {
-    //         // handle error
-    //         console.log(err);
+        console.log('do we get inside the while loop?')
+        console.log('total pages', quiknodeNFTs.data.result.totalPages)
+        console.log('this page', quiknodeNFTs.data.result.pageNumber)
+        i++;
+        data = {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "qn_fetchNFTs",
+            params: {
+                wallet: address,
+                omitFields: ["provenance", "traits"],
+                page: i,
+                perPage: 40,
+            },
+        };
+        quiknodeNFTs = await axios.post(import.meta.env.VITE_QUICKNODE_APK, data, config)
 
-    //     });
+    }
     console.log(domainNFTs)
     return domainNFTs;
+
 };
 
 

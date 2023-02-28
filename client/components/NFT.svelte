@@ -14,15 +14,17 @@
 </script>
 
 {#if nft.title}
-    <div>
-        <h2>{nft.title}</h2>
-        <br />
+
+    <div >
+        
+        
         {#if nft.description}
-            <p>{truncateString(nft.description, 20)}</p>
+        <p class="mb-5">{truncateString(nft.description, 20)}</p> <br />
         {:else}
-            <!-- <p>There is no description available</p> -->
+            <!-- <p>There is no description available</p> <br /> -->
         {/if}
-        <br />
+       
+        <h1 class="mb-2 text-xl font-bold text-secondary">{nft.title}</h1>
         <div class="the-NFT">
             <img
                 src={transformURLs(nft.imageURL)}
