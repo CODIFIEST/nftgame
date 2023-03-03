@@ -3,7 +3,8 @@
     import Hero from "../../components/Hero.svelte";
     import HighScoreList from "../../components/HighScoreList.svelte";
     import connectPhantom from "../../utils/connectPhantom";
-
+import connectMetamask from "../../utils/connectMetamask";
+    import nfts from "../stores/nfts";
 
     // import connectPhantom from "../utils/connectPhantom"
     </script>
@@ -30,6 +31,23 @@
                 }
             }
         >
+        <img
+        class="wallet-image"
+        src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"
+        alt="metamask Fox"
+        on:keypress={async () => {
+            await connectMetamask()
+            // .then(async ()=>{
+
+            // });
+         
+        }}
+        on:click={async () => {
+            await connectMetamask();
+            console.log('nfts from login page',$nfts);
+                await push ('/displaychars');
+        }}
+    />
     
     </div>
 

@@ -1,5 +1,8 @@
 <script lang="ts">
 import connectPhantom from "../utils/connectPhantom"
+import connectMetamask from "../utils/connectMetamask"
+    import fetchCantos from "../utils/getCantosNFTs";
+    import { signer } from "../src/stores/signer";
 </script>
 
 <div style="display: block;">
@@ -15,6 +18,9 @@ import connectPhantom from "../utils/connectPhantom"
         on:click={
             async ()=>{
                 await connectPhantom();
+                console.log("signer below connectPhantom", $signer)
+                // const nfts =  await fetchCantos($signer);
+                // console.log ('nfts', nfts)
             }
         }
         on:keypress={
@@ -23,7 +29,7 @@ import connectPhantom from "../utils/connectPhantom"
             }
         }
     >
-
+ 
 </div>
 </div>
 
