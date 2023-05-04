@@ -1,6 +1,7 @@
 <script lang="ts">
     import axios from "axios";
     import { onMount } from "svelte";
+    import { NFTType } from "../../server/domain/nft";
     import highscores from "../src/stores/highscores";
     let scores = [];
     let onthelist=[];
@@ -15,9 +16,7 @@
         scores = await getHighScores();
           // sort by value
         scores.sort((a,b)=> b.score - a.score)
-        // if (scores.length > 10){
-        //     scores.length = 10;
-        // }
+
         scores.forEach((score)=>{
             if (!onthelist.some(e=>e.imageURL=== score.imageURL)){
                 onthelist.push(score)
@@ -36,7 +35,7 @@
     })
 
 </script>
-<div class="carousel rounded-box">
+<div class="carousel rounded-box  space-x-3">
 <!-- {#each scores as p1score } -->
 
 {#each onthelist as p1score}
@@ -45,8 +44,8 @@
     <div class="carousel-item rounded-md">
     
         <!-- <br> Token: {p1score.token} -->
-         <img src={p1score.imageURL} height="200px" width="200px" alt="super panda">
-         <p class="mb-5 text-secondary">   Name: {p1score.playerName}
+         <img src={p1score.imageURL} class="w-52" alt="super panda">
+         <p class="mb-5 text-secondary">   Name: {p1score.playerName.slice(0,20)}
     <br>    Score: {p1score.score}</p>
         </div>
 
