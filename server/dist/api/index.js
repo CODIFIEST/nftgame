@@ -65,7 +65,7 @@ app.use((0, cors_1.default)());
 app.get("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let cleanData = [];
     console.log('getting scores');
-    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "highscores"));
+    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "23mayhighscores"));
     allScores.forEach((item) => {
         let score = item.data();
         score.id = item.id;

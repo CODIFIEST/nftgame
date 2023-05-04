@@ -34,7 +34,7 @@ app.use(cors());
 app.get("/scores", async (req, res) => {
     let cleanData:HighScore[]=[];
     console.log('getting scores')
-   const allScores = await getDocs(collection(database, "highscores")) 
+   const allScores = await getDocs(collection(database, "23mayhighscores")) 
    allScores.forEach((item)=>{
     let score = item.data() as any as HighScore
     score.id = item.id
