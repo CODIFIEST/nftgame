@@ -35,17 +35,18 @@
     })
 
 </script>
-<div class="carousel rounded-box  space-x-3">
+<div class="carousel rounded-box ">
 <!-- {#each scores as p1score } -->
 
-{#each onthelist as p1score}
+
+{#each $highscores as p1score}
     
 
     <div class="carousel-item rounded-md">
     
         <!-- <br> Token: {p1score.token} -->
-         <img src={p1score.imageURL} class="w-52" alt="super panda">
-         <p class="mb-5 text-secondary">   Name: {p1score.playerName.slice(0,20)}
+        <img src={p1score.imageURL} height="200px" width="200px" alt="super panda">
+        <p class="mb-5 text-secondary">   Name: {p1score.playerName}
     <br>    Score: {p1score.score}</p>
         </div>
 
