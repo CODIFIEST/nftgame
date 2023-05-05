@@ -65,7 +65,7 @@ app.use((0, cors_1.default)());
 app.get("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let cleanData = [];
     console.log('getting scores');
-    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "23mayhighscores"));
+    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "highscores"));
     allScores.forEach((item) => {
         let score = item.data();
         score.id = item.id;
@@ -98,6 +98,7 @@ app.post("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     const newScores = yield (0, firestore_1.addDoc)((0, firestore_1.collection)(database, "highscores"), player1score);
     // newScores.push(player1score);
     // fs.writeFileSync("./highscores.json", JSON.stringify(scores))
+    console.log(`new score saved ${newScores}`);
     res.send(newScores);
 }));
 app.listen(3888);
