@@ -39,7 +39,7 @@
 <!-- {#each scores as p1score } -->
 
 
-{#each $highscores as p1score}
+{#each scores as p1score}
     
 
     <div class="carousel-item rounded-md">
