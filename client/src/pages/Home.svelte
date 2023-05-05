@@ -17,7 +17,7 @@
 
 <input
 class = "input"
-bind:value={$playerName} type="text" placeholder="Put your name here" />
+bind:value={$playerName} type="text" placeholder="Put your name here" maxlength="10" />
 <button
 class="btn"
     on:click={async () => {
