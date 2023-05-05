@@ -68,6 +68,7 @@ app.post("/scores", async (req, res) => {
     const newScores = await addDoc(collection(database, "23mayhighscores"), player1score)
     // newScores.push(player1score);
     // fs.writeFileSync("./highscores.json", JSON.stringify(scores))
+    console.log(`new score saved ${newScores}`)
    
     res.send(newScores)
 })
