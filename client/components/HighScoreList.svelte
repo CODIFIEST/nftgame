@@ -29,6 +29,8 @@
         }
         highscores.set(onthelist)
              console.log(' here are the high score stored in a local array', $highscores)
+             console.log(onthelist)
+             scores = onthelist;
 // console.log('do scores and onthelist look different?', scores)
 // console.log('onthelist', onthelist)
 
