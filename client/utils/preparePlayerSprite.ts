@@ -15,6 +15,10 @@ function colorDistance(r1: number, g1: number, b1: number, r2: number, g2: numbe
     return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
+function luminance(r: number, g: number, b: number): number {
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
 export default async function preparePlayerSprite(url: string): Promise<string> {
     const image = await imageFromUrl(url);
     const canvas = document.createElement("canvas");
@@ -48,19 +52,68 @@ export default async function preparePlayerSprite(url: string): Promise<string> 
     const edgeR = r / corners.length;
     const edgeG = g / corners.length;
     const edgeB = b / corners.length;
+    const edgeLum = luminance(edgeR, edgeG, edgeB);
 
-    const tolerance = 78;
-    for (let i = 0; i < pixels.length; i += 4) {
+    // Remove only edge-connected background-like pixels so foreground details survive.
+    const tolerance = 34;
+    const maxLuminanceDelta = 24;
+    const width = canvas.width;
+    const height = canvas.height;
+    const visited = new Uint8Array(width * height);
+    const queue: number[] = [];
+
+    function pushIfBackgroundCandidate(x: number, y: number) {
+        if (x < 0 || y < 0 || x >= width || y >= height) {
+            return;
+        }
+        const idx = y * width + x;
+        if (visited[idx]) {
+            return;
+        }
+        const pixelIndex = idx * 4;
+        if (pixels[pixelIndex + 3] < 8) {
+            visited[idx] = 1;
+            queue.push(idx);
+            return;
+        }
         const dist = colorDistance(
-            pixels[i],
-            pixels[i + 1],
-            pixels[i + 2],
+            pixels[pixelIndex],
+            pixels[pixelIndex + 1],
+            pixels[pixelIndex + 2],
             edgeR,
             edgeG,
             edgeB,
         );
-        if (dist <= tolerance) {
-            pixels[i + 3] = 0;
+        const lum = luminance(pixels[pixelIndex], pixels[pixelIndex + 1], pixels[pixelIndex + 2]);
+        if (dist <= tolerance && Math.abs(lum - edgeLum) <= maxLuminanceDelta) {
+            visited[idx] = 1;
+            queue.push(idx);
+        }
+    }
+
+    for (let x = 0; x < width; x += 1) {
+        pushIfBackgroundCandidate(x, 0);
+        pushIfBackgroundCandidate(x, height - 1);
+    }
+    for (let y = 0; y < height; y += 1) {
+        pushIfBackgroundCandidate(0, y);
+        pushIfBackgroundCandidate(width - 1, y);
+    }
+
+    while (queue.length > 0) {
+        const idx = queue.shift() as number;
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+        pushIfBackgroundCandidate(x + 1, y);
+        pushIfBackgroundCandidate(x - 1, y);
+        pushIfBackgroundCandidate(x, y + 1);
+        pushIfBackgroundCandidate(x, y - 1);
+    }
+
+    for (let i = 0; i < visited.length; i += 1) {
+        if (visited[i]) {
+            const pixelIndex = i * 4;
+            pixels[pixelIndex + 3] = 0;
         }
     }
     ctx.putImageData(imgData, 0, 0);

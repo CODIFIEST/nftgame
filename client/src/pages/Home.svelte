@@ -14,6 +14,11 @@
             imageURL: "",
         });
     }
+
+    async function submitName() {
+        setPlayerName();
+        await push('/login');
+    }
     player1.set({ playerName: "", token: "", score: 0, imageURL: "" });
 
     onMount(() => {
@@ -31,15 +36,15 @@
 
 <input
 class = "input"
-bind:value={$playerName} type="text" placeholder="Put your name here" maxlength="10" />
+bind:value={$playerName} type="text" placeholder="Put your name here" maxlength="10"
+on:keydown={async (event) => {
+    if (event.key === "Enter") {
+        await submitName();
+    }
+}} />
 <button
 class="btn"
-    on:click={async () => {
-        setPlayerName();
-        await push('/login')
-      
-
-    }}>Let's Play!</button
+    on:click={submitName}>Let's Play!</button
 >
 <h1 class="mb-5 text-5xl font-bold text-secondary">Hello there </h1>
 <p class="mb-5 text-secondary">

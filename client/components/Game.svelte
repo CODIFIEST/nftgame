@@ -23,25 +23,19 @@
         bombSpeed: number;
     };
 
-    const LEVELS: LevelConfig[] = [
+    const BASE_LEVEL_THEMES: Pick<LevelConfig, "title" | "tint" | "platformLayout">[] = [
         {
             title: "Rooftop Run",
             tint: 0x9bd5ff,
-            starCount: 12,
-            targetBombs: 1,
-            bombSpeed: 140,
             platformLayout: [
-                { x: 120, y: 720 },
-                { x: 760, y: 650 },
-                { x: 1120, y: 500 },
+                { x: 170, y: 820, scaleX: 1.25 },
+                { x: 560, y: 680, scaleX: 1.2 },
+                { x: 980, y: 560, scaleX: 1.15 },
             ],
         },
         {
             title: "Factory Lift",
             tint: 0xffd38f,
-            starCount: 14,
-            targetBombs: 2,
-            bombSpeed: 170,
             platformLayout: [
                 { x: 190, y: 840, scaleX: 1.45 },
                 { x: 470, y: 715, scaleX: 1.3 },
@@ -52,47 +46,83 @@
         {
             title: "Storm Walk",
             tint: 0xbac3ff,
-            starCount: 15,
-            targetBombs: 3,
-            bombSpeed: 190,
             platformLayout: [
-                { x: 120, y: 670 },
-                { x: 450, y: 520 },
-                { x: 780, y: 650 },
-                { x: 1120, y: 500 },
-                { x: 1320, y: 380 },
+                { x: 180, y: 810, scaleX: 1.3 },
+                { x: 460, y: 670, scaleX: 1.2 },
+                { x: 760, y: 560, scaleX: 1.15 },
+                { x: 1040, y: 670, scaleX: 1.15 },
+                { x: 1270, y: 540, scaleX: 1.1 },
             ],
         },
         {
             title: "Neon Tunnel",
             tint: 0xff9add,
-            starCount: 16,
-            targetBombs: 4,
-            bombSpeed: 220,
             platformLayout: [
-                { x: 170, y: 740 },
-                { x: 420, y: 560 },
-                { x: 710, y: 430 },
-                { x: 980, y: 560 },
-                { x: 1220, y: 390 },
+                { x: 190, y: 825, scaleX: 1.25 },
+                { x: 460, y: 690, scaleX: 1.2 },
+                { x: 740, y: 565, scaleX: 1.15 },
+                { x: 1020, y: 690, scaleX: 1.15 },
+                { x: 1240, y: 545, scaleX: 1.1 },
             ],
         },
         {
             title: "Core Breach",
             tint: 0xff8d8d,
-            starCount: 18,
-            targetBombs: 5,
-            bombSpeed: 245,
             platformLayout: [
-                { x: 110, y: 690 },
-                { x: 340, y: 520 },
-                { x: 590, y: 670 },
-                { x: 820, y: 470 },
-                { x: 1070, y: 640 },
-                { x: 1290, y: 430 },
+                { x: 170, y: 805, scaleX: 1.3 },
+                { x: 390, y: 660, scaleX: 1.15 },
+                { x: 620, y: 805, scaleX: 1.1 },
+                { x: 860, y: 640, scaleX: 1.1 },
+                { x: 1090, y: 790, scaleX: 1.1 },
+                { x: 1270, y: 625, scaleX: 1.05 },
             ],
         },
     ];
+
+    function clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function buildLayoutForLevel(index: number, baseLayout: PlatformConfig[]): PlatformConfig[] {
+        const yLift = Math.min(80, Math.floor(index / 2) * 2);
+        const layout = baseLayout.map((piece, itemIndex) => {
+            const xJitter = ((index * 37 + itemIndex * 29) % 51) - 25;
+            const yJitter = ((index * 13 + itemIndex * 7) % 17) - 8;
+            return {
+                x: clamp(piece.x + xJitter, 110, 1290),
+                y: clamp(piece.y - yLift + yJitter, 430, 860),
+                scaleX: piece.scaleX,
+            };
+        });
+
+        const lowestLedge = Math.max(...layout.map((piece) => piece.y));
+        const requiredLowestLedge = 790;
+        if (lowestLedge < requiredLowestLedge) {
+            const delta = requiredLowestLedge - lowestLedge;
+            layout.forEach((piece) => {
+                piece.y = clamp(piece.y + delta, 430, 860);
+            });
+        }
+        return layout;
+    }
+
+    function buildLevels(totalLevels: number): LevelConfig[] {
+        const levels: LevelConfig[] = [];
+        for (let i = 0; i < totalLevels; i += 1) {
+            const theme = BASE_LEVEL_THEMES[i % BASE_LEVEL_THEMES.length];
+            levels.push({
+                title: `${theme.title} ${i + 1}`,
+                tint: theme.tint,
+                platformLayout: buildLayoutForLevel(i, theme.platformLayout),
+                starCount: 12 + Math.min(24, Math.floor(i / 4)),
+                targetBombs: 1 + Math.min(24, i),
+                bombSpeed: 140 + Math.min(260, i * 3),
+            });
+        }
+        return levels;
+    }
+
+    const LEVELS: LevelConfig[] = buildLevels(100);
 
     const GAME_WIDTH = 1400;
     const GAME_HEIGHT = 1000;
@@ -100,6 +130,13 @@
     const PLAYER_NAME_KEY = "nftgame.playerName";
     const PLAYER_NFT_KEY = "nftgame.playerNft";
     const PLAYER_IMAGE_KEY = "nftgame.playerImage";
+    const PLAYER_MOVE_SPEED = 190;
+    const JUMP_INITIAL_VELOCITY = -320;
+    const JUMP_HOLD_ACCEL = -760;
+    const JUMP_HOLD_MAX_MS = 210;
+    const JUMP_RELEASE_CUTOFF = -120;
+    const WORLD_GRAVITY_Y = 320;
+    const API_BASE_URL = "https://nftgame-server.vercel.app";
 
     let game: Phaser.Game | null = null;
     let sceneRef: Phaser.Scene | null = null;
@@ -134,6 +171,8 @@
     let onWindowError: ((event: ErrorEvent) => void) | undefined;
     let onUnhandledRejection: ((event: PromiseRejectionEvent) => void) | undefined;
     let runtimeSpriteObjectUrl: string | null = null;
+    let jumpHoldTimeMs = 0;
+    let jumpPressedLastFrame = false;
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
 
@@ -180,6 +219,57 @@
 
     function activeLevelConfig(): LevelConfig {
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
+    }
+
+    function estimateMaxJumpRisePx(): number {
+        const dt = 1 / 120;
+        let vy = JUMP_INITIAL_VELOCITY;
+        let y = 0;
+        let maxRise = 0;
+        let holdTime = 0;
+
+        for (let i = 0; i < 600; i += 1) {
+            if (vy < 0 && holdTime < JUMP_HOLD_MAX_MS) {
+                vy += JUMP_HOLD_ACCEL * dt;
+                holdTime += dt * 1000;
+            }
+
+            vy += WORLD_GRAVITY_Y * dt;
+            y += vy * dt;
+            maxRise = Math.max(maxRise, -y);
+            if (vy > 0 && y >= 0) {
+                break;
+            }
+        }
+
+        return maxRise;
+    }
+
+    function verifyAllLevelFirstLedgeReachability(scene: Phaser.Scene) {
+        const groundTexture = scene.textures.get("ground").getSourceImage() as { height?: number };
+        const groundHeight = groundTexture?.height ?? 64;
+        const groundTop = 1050 - groundHeight / 2;
+        const maxJumpRise = estimateMaxJumpRisePx();
+        const safetyMargin = 12;
+
+        LEVELS.forEach((cfg, idx) => {
+            const lowestLedgeY = Math.max(...cfg.platformLayout.map((piece) => piece.y));
+            const lowestLedgeTop = lowestLedgeY - groundHeight / 2;
+            const riseRequired = groundTop - lowestLedgeTop;
+            const reachable = riseRequired <= maxJumpRise - safetyMargin;
+            const payload = {
+                level: idx + 1,
+                title: cfg.title,
+                riseRequired: Math.round(riseRequired),
+                maxJumpRise: Math.round(maxJumpRise),
+                reachable,
+            };
+            if (!reachable) {
+                console.error("[GameDebug] first ledge unreachable with current jump model", payload);
+            } else {
+                console.log("[GameDebug] first ledge reachable", payload);
+            }
+        });
     }
 
     function dataUrlToObjectUrl(dataUrl: string): string | null {
@@ -272,6 +362,8 @@
         uiScore = 0;
         uiCombo = 1;
         uiLevel = 1;
+        jumpHoldTimeMs = 0;
+        jumpPressedLastFrame = false;
     }
 
     function buildPlatforms(scene: Phaser.Scene, layout: PlatformConfig[]) {
@@ -288,6 +380,30 @@
             if (piece.scaleX) {
                 platform.setScale(piece.scaleX, 1).refreshBody();
             }
+        });
+    }
+
+    function placePlayerAtLevelStart() {
+        if (!player) {
+            return;
+        }
+        const lowestLedge = activeLevelConfig().platformLayout.reduce((acc, piece) => {
+            if (piece.y > acc.y) {
+                return piece;
+            }
+            return acc;
+        }, activeLevelConfig().platformLayout[0]);
+        const spawnX = lowestLedge.x;
+        const spawnY = lowestLedge.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
+        const body = player.body as Phaser.Physics.Arcade.Body;
+        body.reset(spawnX, spawnY);
+        player.clearTint();
+        player.setVelocity(0, 0);
+        console.log("[GameDebug] repositioned player for new level", {
+            level,
+            spawnX,
+            spawnY,
+            lowestLedgeY: lowestLedge.y,
         });
     }
 
@@ -401,6 +517,7 @@
         buildPlatforms(scene, config.platformLayout);
         resetStars();
         syncBombCount(scene);
+        placePlayerAtLevelStart();
         uiLevel = level;
         comboMultiplier = 1;
         uiCombo = 1;
@@ -419,7 +536,7 @@
         try {
             const originalTokenAddress = selectedNft?.tokenAddress ?? "";
             const originalImageUrl = selectedNft?.imageURL ?? "";
-            await axios.post("https://nftgame-server.vercel.app/scores", {
+            await axios.post(`${API_BASE_URL}/scores`, {
                 token: originalTokenAddress,
                 imageURL: originalImageUrl,
                 score,
@@ -565,6 +682,7 @@
         applyLevelTheme(this, true);
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(bombs, platforms);
+        verifyAllLevelFirstLedgeReachability(this);
         console.log("[GameDebug] create complete");
     }
 
@@ -582,12 +700,12 @@
         }
 
         if (cursors.left.isDown) {
-            player.setVelocityX(-180);
+            player.setVelocityX(-PLAYER_MOVE_SPEED);
             if (nearLayer) {
                 nearLayer.tilePositionX -= 1.6;
             }
         } else if (cursors.right.isDown) {
-            player.setVelocityX(180);
+            player.setVelocityX(PLAYER_MOVE_SPEED);
             if (nearLayer) {
                 nearLayer.tilePositionX += 1.6;
             }
@@ -595,9 +713,29 @@
             player.setVelocityX(0);
         }
 
-        if (cursors.up.isDown && player.body.touching.down) {
-            player.setVelocityY(-460);
+        const jumpPressed = Boolean(cursors.up.isDown);
+        const body = player.body as Phaser.Physics.Arcade.Body;
+        const dt = (sceneRef?.game.loop.delta ?? 16.67) / 1000;
+
+        if (jumpPressed && !jumpPressedLastFrame && body.blocked.down) {
+            player.setVelocityY(JUMP_INITIAL_VELOCITY);
+            jumpHoldTimeMs = 0;
         }
+
+        if (jumpPressed && body.velocity.y < 0 && jumpHoldTimeMs < JUMP_HOLD_MAX_MS) {
+            player.setVelocityY(body.velocity.y + JUMP_HOLD_ACCEL * dt);
+            jumpHoldTimeMs += dt * 1000;
+        }
+
+        if (!jumpPressed && body.velocity.y < JUMP_RELEASE_CUTOFF) {
+            player.setVelocityY(JUMP_RELEASE_CUTOFF);
+        }
+
+        if (body.blocked.down && !jumpPressed) {
+            jumpHoldTimeMs = 0;
+        }
+
+        jumpPressedLastFrame = jumpPressed;
     }
 
     function retryRun() {
@@ -638,7 +776,7 @@
             physics: {
                 default: "arcade",
                 arcade: {
-                    gravity: { y: 320 },
+                    gravity: { y: WORLD_GRAVITY_Y },
                     debug: false,
                 },
             },
