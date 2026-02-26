@@ -221,6 +221,24 @@
         }
     }
 
+    function getPersistedNft():
+        | { tokenAddress?: string; imageURL?: string }
+        | null {
+        if (typeof window === "undefined") {
+            return null;
+        }
+        const persistedNft = sessionStorage.getItem(PLAYER_NFT_KEY);
+        if (!persistedNft) {
+            return null;
+        }
+        try {
+            return JSON.parse(persistedNft) as { tokenAddress?: string; imageURL?: string };
+        } catch (error) {
+            console.error("[GameDebug] failed to parse persisted NFT for score save", error);
+            return null;
+        }
+    }
+
     function resetSessionState() {
         score = 0;
         level = 1;
@@ -269,8 +287,8 @@
         player.setScale(safeScale);
         const body = player.body as Phaser.Physics.Arcade.Body;
         body.setSize(
-            Math.max(44, Math.floor(sourceWidth * 0.52)),
-            Math.max(72, Math.floor(sourceHeight * 0.98)),
+            Math.max(36, Math.floor(sourceWidth * 0.45)),
+            Math.max(62, Math.floor(sourceHeight * 0.9)),
             true,
         );
         console.log("[GameDebug] normalized player sprite", {
@@ -378,15 +396,21 @@
     }
 
     async function saveScore() {
-        const selectedNft = $player1nft;
+        const selectedNft = $player1nft ?? getPersistedNft();
         submittingScore = true;
         scoreSaveError = "";
         try {
+            const originalTokenAddress = selectedNft?.tokenAddress ?? "";
+            const originalImageUrl = selectedNft?.imageURL ?? "";
             await axios.post("https://nftgame-server.vercel.app/scores", {
-                token: selectedNft?.tokenAddress ?? "",
-                imageURL: selectedNft?.imageURL ?? $playerImage ?? "",
+                token: originalTokenAddress,
+                imageURL: originalImageUrl,
                 score,
                 playerName: $playerName ?? "anonymous",
+            });
+            console.log("[GameDebug] score payload uses original NFT", {
+                token: originalTokenAddress,
+                imageURL: originalImageUrl,
             });
         } catch (error) {
             scoreSaveError = "Unable to save score right now.";

@@ -3,6 +3,7 @@
     import player1nft from "../src/stores/player1nft";
     import { playerImage } from "../src/stores/playerImage";
     import transformURLs from "../utils/transformURLs";
+    import preparePlayerSprite from "../utils/preparePlayerSprite";
     import truncateString from "../utils/truncateString";
     import { push } from "svelte-spa-router";
     const PLAYER_NFT_KEY = "nftgame.playerNft";
@@ -29,10 +30,16 @@
                 alt={nft.title}
                 on:click={async () => {
                     const resolvedImage = transformURLs(nft.imageURL);
+                    let processedImage = resolvedImage;
+                    try {
+                        processedImage = await preparePlayerSprite(resolvedImage);
+                    } catch (error) {
+                        console.warn("Sprite preprocessing failed, using original NFT image.", error);
+                    }
                     player1nft.set(nft);
-                    playerImage.set(resolvedImage);
+                    playerImage.set(processedImage);
                     sessionStorage.setItem(PLAYER_NFT_KEY, JSON.stringify(nft));
-                    sessionStorage.setItem(PLAYER_IMAGE_KEY, resolvedImage);
+                    sessionStorage.setItem(PLAYER_IMAGE_KEY, processedImage);
                     await push('/game');
                 }}
                 on:keypress={() => {
