@@ -269,13 +269,9 @@
         player.setScale(safeScale);
         const body = player.body as Phaser.Physics.Arcade.Body;
         body.setSize(
-            Math.max(44, Math.floor(sourceWidth * safeScale * 0.55)),
-            Math.max(58, Math.floor(sourceHeight * safeScale * 0.75)),
+            Math.max(44, Math.floor(sourceWidth * 0.52)),
+            Math.max(72, Math.floor(sourceHeight * 0.98)),
             true,
-        );
-        body.setOffset(
-            Math.max(0, Math.floor((player.displayWidth - body.width) / 2)),
-            Math.max(0, Math.floor(player.displayHeight - body.height)),
         );
         console.log("[GameDebug] normalized player sprite", {
             sourceWidth,
