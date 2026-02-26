@@ -256,6 +256,37 @@
         });
     }
 
+    function normalizePlayerSprite(scene: Phaser.Scene) {
+        const dudeTexture = scene.textures.get("dude");
+        const source = dudeTexture.getSourceImage() as { width?: number; height?: number };
+        const sourceWidth = source?.width ?? 96;
+        const sourceHeight = source?.height ?? 96;
+        const maxWidth = 96;
+        const maxHeight = 112;
+        const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+        const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+        player.setScale(safeScale);
+        const body = player.body as Phaser.Physics.Arcade.Body;
+        body.setSize(
+            Math.max(44, Math.floor(sourceWidth * safeScale * 0.55)),
+            Math.max(58, Math.floor(sourceHeight * safeScale * 0.75)),
+            true,
+        );
+        body.setOffset(
+            Math.max(0, Math.floor((player.displayWidth - body.width) / 2)),
+            Math.max(0, Math.floor(player.displayHeight - body.height)),
+        );
+        console.log("[GameDebug] normalized player sprite", {
+            sourceWidth,
+            sourceHeight,
+            displayWidth: player.displayWidth,
+            displayHeight: player.displayHeight,
+            bodyWidth: body.width,
+            bodyHeight: body.height,
+        });
+    }
+
     function spawnBomb(scene: Phaser.Scene, speedBase: number) {
         const x = player && player.x < GAME_WIDTH / 2
             ? Phaser.Math.Between(700, GAME_WIDTH - 50)
@@ -473,6 +504,7 @@
         glowOverlay.setBlendMode(Phaser.BlendModes.SCREEN);
 
         player = this.physics.add.sprite(100, 450, "dude");
+        normalizePlayerSprite(this);
         player.setBounce(0.2);
         player.setCollideWorldBounds(true);
 
