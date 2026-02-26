@@ -137,6 +137,7 @@
     const JUMP_RELEASE_CUTOFF = -120;
     const WORLD_GRAVITY_Y = 320;
     const API_BASE_URL = "https://nftgame-server.vercel.app";
+    const PLAYER_BOMB_SAFE_DISTANCE = 260;
 
     let game: Phaser.Game | null = null;
     let sceneRef: Phaser.Scene | null = null;
@@ -435,9 +436,16 @@
     }
 
     function spawnBomb(scene: Phaser.Scene, speedBase: number) {
-        const x = player && player.x < GAME_WIDTH / 2
-            ? Phaser.Math.Between(700, GAME_WIDTH - 50)
-            : Phaser.Math.Between(50, 650);
+        let x = Phaser.Math.Between(50, GAME_WIDTH - 50);
+        if (player) {
+            for (let attempt = 0; attempt < 8; attempt += 1) {
+                const candidate = Phaser.Math.Between(50, GAME_WIDTH - 50);
+                if (Math.abs(candidate - player.x) >= PLAYER_BOMB_SAFE_DISTANCE) {
+                    x = candidate;
+                    break;
+                }
+            }
+        }
         const bomb = bombs.create(x, 16, "bomb");
         bomb.setBounce(1);
         bomb.setCollideWorldBounds(true);
@@ -445,6 +453,38 @@
             Phaser.Math.Between(-speedBase, speedBase),
             Phaser.Math.Between(80, 160),
         );
+    }
+
+    function enforceBombSafeZone(scene: Phaser.Scene, speedBase: number) {
+        if (!player) {
+            return;
+        }
+        bombs.children.each((child) => {
+            const bomb = child as Phaser.Physics.Arcade.Image;
+            if (!bomb.active) {
+                return;
+            }
+            const dx = Math.abs(bomb.x - player.x);
+            const dy = Math.abs(bomb.y - player.y);
+            const tooClose = dx < PLAYER_BOMB_SAFE_DISTANCE && dy < 220;
+            if (!tooClose) {
+                return;
+            }
+
+            let nextX = bomb.x;
+            for (let attempt = 0; attempt < 10; attempt += 1) {
+                const candidate = Phaser.Math.Between(50, GAME_WIDTH - 50);
+                if (Math.abs(candidate - player.x) >= PLAYER_BOMB_SAFE_DISTANCE) {
+                    nextX = candidate;
+                    break;
+                }
+            }
+            bomb.setPosition(nextX, 16);
+            bomb.setVelocity(
+                Phaser.Math.Between(-speedBase, speedBase),
+                Phaser.Math.Between(80, 160),
+            );
+        });
     }
 
     function syncBombCount(scene: Phaser.Scene) {
@@ -516,8 +556,9 @@
 
         buildPlatforms(scene, config.platformLayout);
         resetStars();
-        syncBombCount(scene);
         placePlayerAtLevelStart();
+        syncBombCount(scene);
+        enforceBombSafeZone(scene, config.bombSpeed);
         uiLevel = level;
         comboMultiplier = 1;
         uiCombo = 1;

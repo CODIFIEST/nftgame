@@ -8,6 +8,7 @@
     const currentSeason = `${currentDate.getUTCFullYear()}-Q${Math.floor(currentDate.getUTCMonth() / 3) + 1}`;
     let seasonScores = [];
     let allTimeScores = [];
+    let allTimeFallbackUsed = false;
 
     async function getSeasonScores() {
         const result = await axios.get(`${API_BASE_URL}/scores`);
@@ -17,9 +18,17 @@
     }
 
     async function getAllTimeScores() {
-        const result = await axios.get(`${API_BASE_URL}/scores/all-time`);
-        console.log('all-time results', result.data)
-        return result.data
+        try {
+            const result = await axios.get(`${API_BASE_URL}/scores/all-time`);
+            console.log('all-time results', result.data)
+            allTimeFallbackUsed = false;
+            return result.data
+        } catch (error) {
+            console.warn("all-time endpoint unavailable, falling back to current season scores", error);
+            const fallback = await axios.get(`${API_BASE_URL}/scores`);
+            allTimeFallbackUsed = true;
+            return fallback.data;
+        }
         
     }
 
@@ -67,6 +76,9 @@
 </div>
 
 <p class="season-label text-secondary">All-Time Highscores</p>
+{#if allTimeFallbackUsed}
+    <p class="season-label text-secondary">(fallback view: current season data)</p>
+{/if}
 <div class="carousel rounded-box ">
 {#each allTimeScores as p1score}
 

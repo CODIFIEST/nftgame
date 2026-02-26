@@ -1,6 +1,9 @@
 {
   "name": "server",
   "version": "1.0.0",
+  "engines": {
+    "node": "24.x"
+  },
   "description": "The backend Express server written in Node.js for our app.",
   "main": "index.js",
   "scripts": {
