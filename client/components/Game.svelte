@@ -43,10 +43,10 @@
             targetBombs: 2,
             bombSpeed: 170,
             platformLayout: [
-                { x: 240, y: 760 },
-                { x: 620, y: 620 },
-                { x: 1000, y: 470 },
-                { x: 1260, y: 340 },
+                { x: 220, y: 760, scaleX: 1.25 },
+                { x: 520, y: 650, scaleX: 1.25 },
+                { x: 830, y: 545, scaleX: 1.25 },
+                { x: 1130, y: 440, scaleX: 1.2 },
             ],
         },
         {
@@ -97,6 +97,9 @@
     const GAME_WIDTH = 1400;
     const GAME_HEIGHT = 1000;
     const GAME_CONTAINER_ID = "game-root";
+    const PLAYER_NAME_KEY = "nftgame.playerName";
+    const PLAYER_NFT_KEY = "nftgame.playerNft";
+    const PLAYER_IMAGE_KEY = "nftgame.playerImage";
 
     let game: Phaser.Game | null = null;
     let sceneRef: Phaser.Scene | null = null;
@@ -191,6 +194,31 @@
             highScoreValue,
         });
         console.groupEnd();
+    }
+
+    function hydratePersistedPlayerState() {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const persistedName = sessionStorage.getItem(PLAYER_NAME_KEY);
+        if (persistedName && !$playerName) {
+            playerName.set(persistedName);
+        }
+
+        const persistedImage = sessionStorage.getItem(PLAYER_IMAGE_KEY);
+        if (persistedImage && !$playerImage) {
+            playerImage.set(persistedImage);
+        }
+
+        const persistedNft = sessionStorage.getItem(PLAYER_NFT_KEY);
+        if (persistedNft && !$player1nft) {
+            try {
+                player1nft.set(JSON.parse(persistedNft));
+            } catch (error) {
+                console.error("[GameDebug] failed to parse persisted NFT", error);
+            }
+        }
     }
 
     function resetSessionState() {
@@ -419,13 +447,15 @@
         this.load.on("start", () => console.log("[GameDebug] asset load start"));
         this.load.on("complete", () => console.log("[GameDebug] asset load complete"));
         this.load.on("loaderror", (file: unknown) => console.error("[GameDebug] asset load error", file));
+        const selectedPlayerImage =
+            $playerImage || (typeof window !== "undefined" ? sessionStorage.getItem(PLAYER_IMAGE_KEY) : null) || "./dude.png";
         this.load.image("sky", "./newsky.png");
         this.load.image("sky-old", "./sky.png");
         this.load.image("cityline", "./buildingpixelated.png");
         this.load.image("ground", "./platform.png");
         this.load.image("star", "./star.png");
         this.load.image("bomb", "./bomb.png");
-        this.load.image("dude", $playerImage || "./dude.png", {
+        this.load.image("dude", selectedPlayerImage, {
             frameWidth: 180,
             frameHeight: 270,
         });
@@ -499,6 +529,7 @@
 
     onMount(() => {
         console.log("[GameDebug] onMount start");
+        hydratePersistedPlayerState();
         resetSessionState();
         runSanityChecks();
 

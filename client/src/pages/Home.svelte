@@ -1,8 +1,10 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import HighScoreList from "../../components/HighScoreList.svelte";
     import player1 from "../stores/player1";
     import playerName from "../stores/playername";
     import { push } from "svelte-spa-router/Router.svelte";
+    const PLAYER_NAME_KEY = "nftgame.playerName";
 
     function setPlayerName() {
         player1.set({
@@ -13,6 +15,18 @@
         });
     }
     player1.set({ playerName: "", token: "", score: 0, imageURL: "" });
+
+    onMount(() => {
+        const persistedName = sessionStorage.getItem(PLAYER_NAME_KEY);
+        if (persistedName && !$playerName) {
+            playerName.set(persistedName);
+        }
+    });
+
+    $: if ($playerName !== undefined) {
+        const normalizedName = ($playerName ?? "").trim();
+        sessionStorage.setItem(PLAYER_NAME_KEY, normalizedName);
+    }
 </script>
 
 <input

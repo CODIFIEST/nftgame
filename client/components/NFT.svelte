@@ -1,15 +1,13 @@
 <script lang="ts">
     import type { NFT } from "../../server/domain/nft";
-    import type { PlayerScore } from "../src/domain/playerscore";
     import player1nft from "../src/stores/player1nft";
     import { playerImage } from "../src/stores/playerImage";
-    // import transformURLs from "../utils/transformURLs";
     import transformURLs from "../utils/transformURLs";
     import truncateString from "../utils/truncateString";
-    // import Game from "./Game.svelte";
-    import Thumbo, { Transfer } from "thumbo";
     import { push } from "svelte-spa-router";
-    // import truncateString from "../utils/truncateString";
+    const PLAYER_NFT_KEY = "nftgame.playerNft";
+    const PLAYER_IMAGE_KEY = "nftgame.playerImage";
+
     export let nft: NFT;
 </script>
 
@@ -30,37 +28,15 @@
                 src={transformURLs(nft.imageURL)}
                 alt={nft.title}
                 on:click={async () => {
-                     player1nft.set(nft);
-//                     resize the image and save it here for the game TODO this is broken now
-                     Thumbo.init().then(async () => {
-                         Thumbo.thumbnailFromUrl(
-                             `${nft.imageURL}`,
-                             Thumbo.ImageFormat.Png,
-                             270,
-                             200
-                         ).then(async (thumbnailBuffer) => {
-						const daPlayer = await URL.createObjectURL( new Blob([thumbnailBuffer])
-						  );
-//                             const daPlayer = new Blob([thumbnailBuffer,]).toString();
-                             console.log(daPlayer);
-                             playerImage.set(daPlayer);
-                             console.log('WHAT IS THE PLAYERIMAGE', $playerImage);
-                             console.log('what is player1nft', $player1nft);
-                             await push('/game')
-                         });
-                     });
-//                    playerImage.set(nft.imageURL)
-                    // player1nft.set(nft);
-                    // console.log(playerImage)
-                    console.log("NFT.svelte playerImage");
-                    console.log($playerImage);
-                 
-
-                 
-                    // document.getElementById('game-container').innerHTML = `<img src='${nft.imageURL}'>`;
+                    const resolvedImage = transformURLs(nft.imageURL);
+                    player1nft.set(nft);
+                    playerImage.set(resolvedImage);
+                    sessionStorage.setItem(PLAYER_NFT_KEY, JSON.stringify(nft));
+                    sessionStorage.setItem(PLAYER_IMAGE_KEY, resolvedImage);
+                    await push('/game');
                 }}
                 on:keypress={() => {
-                    playerImage.set(nft.imageURL);
+                    playerImage.set(transformURLs(nft.imageURL));
                 }}
             /> <br />
         </div>
