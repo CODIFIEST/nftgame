@@ -133,6 +133,7 @@
     let debugTimerId: number | undefined;
     let onWindowError: ((event: ErrorEvent) => void) | undefined;
     let onUnhandledRejection: ((event: PromiseRejectionEvent) => void) | undefined;
+    let runtimeSpriteObjectUrl: string | null = null;
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
 
@@ -179,6 +180,22 @@
 
     function activeLevelConfig(): LevelConfig {
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
+    }
+
+    function dataUrlToObjectUrl(dataUrl: string): string | null {
+        const matches = dataUrl.match(/^data:(.*?);base64,(.*)$/);
+        if (!matches) {
+            return null;
+        }
+        const mimeType = matches[1] || "image/png";
+        const base64 = matches[2];
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i += 1) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: mimeType });
+        return URL.createObjectURL(blob);
     }
 
     function runSanityChecks() {
@@ -498,8 +515,21 @@
         this.load.on("start", () => console.log("[GameDebug] asset load start"));
         this.load.on("complete", () => console.log("[GameDebug] asset load complete"));
         this.load.on("loaderror", (file: unknown) => console.error("[GameDebug] asset load error", file));
-        const selectedPlayerImage =
+        const persistedImage =
             $playerImage || (typeof window !== "undefined" ? sessionStorage.getItem(PLAYER_IMAGE_KEY) : null) || "./dude.png";
+        if (runtimeSpriteObjectUrl) {
+            URL.revokeObjectURL(runtimeSpriteObjectUrl);
+            runtimeSpriteObjectUrl = null;
+        }
+        let selectedPlayerImage = persistedImage;
+        if (persistedImage.startsWith("data:")) {
+            const objectUrl = dataUrlToObjectUrl(persistedImage);
+            if (objectUrl) {
+                runtimeSpriteObjectUrl = objectUrl;
+                selectedPlayerImage = objectUrl;
+                console.log("[GameDebug] converted data URI sprite to object URL for Phaser loader");
+            }
+        }
         this.load.image("sky", "./newsky.png");
         this.load.image("sky-old", "./sky.png");
         this.load.image("cityline", "./buildingpixelated.png");
@@ -654,6 +684,10 @@
         if (game) {
             game.destroy(true);
             game = null;
+        }
+        if (runtimeSpriteObjectUrl) {
+            URL.revokeObjectURL(runtimeSpriteObjectUrl);
+            runtimeSpriteObjectUrl = null;
         }
     });
 </script>
