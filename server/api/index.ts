@@ -31,16 +31,38 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+function getCurrentSeason(date: Date = new Date()): string {
+    const year = date.getUTCFullYear();
+    const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+    return `${year}-Q${quarter}`;
+}
+
 app.get("/scores", async (req, res) => {
     let cleanData:HighScore[]=[];
+    const currentSeason = getCurrentSeason();
     console.log('getting scores')
    const allScores = await getDocs(collection(database, "23mayhighscores")) 
    allScores.forEach((item)=>{
     let score = item.data() as any as HighScore
+    if (score.season !== currentSeason) {
+        return;
+    }
     score.id = item.id
 cleanData.push(score)
    })
     // const scores = fs.readFileSync('./highscores.json')
+    res.send(cleanData)
+});
+
+app.get("/scores/all-time", async (req, res) => {
+    let cleanData:HighScore[]=[];
+    console.log('getting all-time scores')
+   const allScores = await getDocs(collection(database, "23mayhighscores")) 
+   allScores.forEach((item)=>{
+    let score = item.data() as any as HighScore
+    score.id = item.id
+    cleanData.push(score)
+   })
     res.send(cleanData)
 });
 
@@ -50,6 +72,7 @@ app.post("/scores", async (req, res) => {
     const imageURL = req.body.imageURL;
     const playerName = req.body.playerName;
     const score = req.body.score;
+    const currentSeason = getCurrentSeason();
     // try {
     //     validateUserInput(name, platform, releaseYear, genre, ESRBrating, goodGame)
     // } catch (err) {
@@ -63,6 +86,7 @@ app.post("/scores", async (req, res) => {
         imageURL:imageURL,
         playerName:playerName,
         score:score,
+        season:currentSeason,
         id:""
     }
     const newScores = await addDoc(collection(database, "23mayhighscores"), player1score)

@@ -3,6 +3,7 @@ type HighScore ={
     score:number,
     imageURL:string,
     playerName:string,
+    season:string,
     id:string
    
 }

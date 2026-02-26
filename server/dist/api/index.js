@@ -62,16 +62,36 @@ const database = (0, firestore_1.getFirestore)(dbApp);
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.use((0, cors_1.default)());
+function getCurrentSeason(date = new Date()) {
+    const year = date.getUTCFullYear();
+    const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+    return `${year}-Q${quarter}`;
+}
 app.get("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let cleanData = [];
+    const currentSeason = getCurrentSeason();
     console.log('getting scores');
+    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "23mayhighscores"));
+    allScores.forEach((item) => {
+        let score = item.data();
+        if (score.season !== currentSeason) {
+            return;
+        }
+        score.id = item.id;
+        cleanData.push(score);
+    });
+    // const scores = fs.readFileSync('./highscores.json')
+    res.send(cleanData);
+}));
+app.get("/scores/all-time", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    let cleanData = [];
+    console.log('getting all-time scores');
     const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "23mayhighscores"));
     allScores.forEach((item) => {
         let score = item.data();
         score.id = item.id;
         cleanData.push(score);
     });
-    // const scores = fs.readFileSync('./highscores.json')
     res.send(cleanData);
 }));
 app.post("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -80,6 +100,7 @@ app.post("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     const imageURL = req.body.imageURL;
     const playerName = req.body.playerName;
     const score = req.body.score;
+    const currentSeason = getCurrentSeason();
     // try {
     //     validateUserInput(name, platform, releaseYear, genre, ESRBrating, goodGame)
     // } catch (err) {
@@ -93,6 +114,7 @@ app.post("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         imageURL: imageURL,
         playerName: playerName,
         score: score,
+        season: currentSeason,
         id: ""
     };
     const newScores = yield (0, firestore_1.addDoc)((0, firestore_1.collection)(database, "23mayhighscores"), player1score);
