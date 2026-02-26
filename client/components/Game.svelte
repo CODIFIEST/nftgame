@@ -43,10 +43,10 @@
             targetBombs: 2,
             bombSpeed: 170,
             platformLayout: [
-                { x: 220, y: 760, scaleX: 1.25 },
-                { x: 520, y: 650, scaleX: 1.25 },
-                { x: 830, y: 545, scaleX: 1.25 },
-                { x: 1130, y: 440, scaleX: 1.2 },
+                { x: 190, y: 840, scaleX: 1.45 },
+                { x: 470, y: 715, scaleX: 1.3 },
+                { x: 760, y: 590, scaleX: 1.25 },
+                { x: 1060, y: 470, scaleX: 1.2 },
             ],
         },
         {
