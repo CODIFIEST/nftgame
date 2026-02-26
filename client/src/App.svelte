@@ -1,5 +1,6 @@
 <script lang="ts">
     import Router from 'svelte-spa-router/Router.svelte'
+    import { location } from "svelte-spa-router";
     import DisplayNfTs from "./pages/DisplayNFTs.svelte";
 
     import Hero from "../components/Hero.svelte";
@@ -36,21 +37,36 @@
     // This is optional, but if present it must be the last
     // "*": NotFound,
   };
+
+  $: isGameRoute = $location === "/game";
 </script>
 
 <main>
-
-  <div class="hero min-h-screen" style="background-image: url('https://www.arweave.net/hNN-l4QsOuWIRWwpOn-VDjso2NsGBW3Mg30p18Gs6zQ?ext=png')">
-  
-    <div class="hero-overlay bg-opacity-60" />
-    <div class="hero-content text-center">
-      <div class="max-w-7xl">
-        
-        <!-- <Notifications> -->
-          <Router {routes} />
-        <!-- </Notifications> -->
+  <div
+    class="hero min-h-screen"
+    class:game-shell={isGameRoute}
+    style={!isGameRoute ? "background-image: url('https://www.arweave.net/hNN-l4QsOuWIRWwpOn-VDjso2NsGBW3Mg30p18Gs6zQ?ext=png')" : ""}
+  >
+    {#if !isGameRoute}
+      <div class="hero-overlay bg-opacity-60" />
+    {/if}
+    <div class:hero-content={!isGameRoute} class:game-content={isGameRoute} class:text-center={!isGameRoute}>
+      <div class={isGameRoute ? "w-full" : "max-w-7xl"}>
+        <Router {routes} />
       </div>
     </div>
   </div>
-
 </main>
+
+<style>
+  .game-shell {
+    background: radial-gradient(circle at 20% 20%, #1b2945 0%, #0e182d 45%, #070d18 100%);
+  }
+
+  .game-content {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+  }
+</style>

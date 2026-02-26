@@ -516,6 +516,12 @@
             width: GAME_WIDTH,
             height: GAME_HEIGHT,
             parent: GAME_CONTAINER_ID,
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                width: GAME_WIDTH,
+                height: GAME_HEIGHT,
+            },
             physics: {
                 default: "arcade",
                 arcade: {
@@ -530,6 +536,17 @@
             },
         });
         console.log("[GameDebug] Phaser.Game created", game);
+        const createdCanvas = document.querySelector(`#${GAME_CONTAINER_ID} canvas`) as HTMLCanvasElement | null;
+        if (createdCanvas) {
+            console.log("[GameDebug] canvas size", {
+                cssWidth: createdCanvas.style.width,
+                cssHeight: createdCanvas.style.height,
+                width: createdCanvas.width,
+                height: createdCanvas.height,
+            });
+        } else {
+            console.warn("[GameDebug] canvas element not found immediately after game creation");
+        }
 
         debugTimerId = window.setTimeout(() => {
             if (!sceneRef) {
@@ -616,14 +633,23 @@
 
     .game-shell {
         position: relative;
+        width: min(96vw, 1400px);
         border-radius: 16px;
         overflow: hidden;
         box-shadow: 0 22px 52px var(--ui-shell-shadow);
     }
 
     .game-canvas {
-        min-height: 500px;
+        width: min(96vw, 1400px);
+        aspect-ratio: 14 / 10;
+        min-height: 420px;
         background: radial-gradient(circle at 20% 20%, #3e5a85 0%, #18253f 46%, #0c1423 100%);
+    }
+
+    .game-canvas :global(canvas) {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
     }
 
     .hud {
