@@ -127,6 +127,9 @@
     let uiScore = 0;
     let uiCombo = 1;
     let uiLevel = 1;
+    let debugTimerId: number | undefined;
+    let onWindowError: ((event: ErrorEvent) => void) | undefined;
+    let onUnhandledRejection: ((event: PromiseRejectionEvent) => void) | undefined;
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
 
@@ -175,6 +178,21 @@
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
     }
 
+    function runSanityChecks() {
+        console.group("[GameDebug] Sanity checks");
+        console.assert(Array.isArray(LEVELS) && LEVELS.length > 0, "LEVELS config missing");
+        console.assert(Boolean(document.getElementById(GAME_CONTAINER_ID)), "Game container is missing");
+        console.assert(GAME_WIDTH > 0 && GAME_HEIGHT > 0, "Invalid game dimensions");
+        console.log("Store snapshot", {
+            playerName: $playerName,
+            hasPlayerImage: Boolean($playerImage),
+            hasSelectedNft: Boolean($player1nft),
+            highScoresLoaded: Array.isArray($highscores),
+            highScoreValue,
+        });
+        console.groupEnd();
+    }
+
     function resetSessionState() {
         score = 0;
         level = 1;
@@ -194,6 +212,7 @@
     }
 
     function buildPlatforms(scene: Phaser.Scene, layout: PlatformConfig[]) {
+        console.log("[GameDebug] buildPlatforms", { count: layout.length, level });
         if (!platforms) {
             platforms = scene.physics.add.staticGroup();
         } else {
@@ -226,12 +245,14 @@
         const target = activeLevelConfig().targetBombs;
         const currentCount = bombs.countActive(true);
         const missing = Math.max(0, target - currentCount);
+        console.log("[GameDebug] syncBombCount", { target, currentCount, missing, level });
         for (let i = 0; i < missing; i += 1) {
             spawnBomb(scene, activeLevelConfig().bombSpeed);
         }
     }
 
     function resetStars() {
+        console.log("[GameDebug] resetStars", { level, total: activeLevelConfig().starCount });
         if (!stars) {
             stars = sceneRef!.physics.add.group();
             sceneRef!.physics.add.collider(stars, platforms);
@@ -272,6 +293,7 @@
 
     function applyLevelTheme(scene: Phaser.Scene, showBanner = false) {
         const config = activeLevelConfig();
+        console.log("[GameDebug] applyLevelTheme", { level, title: config.title, showBanner });
         levelThemeName = config.title;
         if (background) {
             background.setTint(config.tint);
@@ -320,6 +342,7 @@
     }
 
     async function hitBomb(this: Phaser.Scene, colliderPlayer: Phaser.GameObjects.GameObject) {
+        console.log("[GameDebug] hitBomb", { isDead, scorePosted, score });
         if (isDead || scorePosted) {
             return;
         }
@@ -349,6 +372,7 @@
         score += points;
         uiScore = score;
         uiCombo = comboMultiplier;
+        console.log("[GameDebug] collectStar", { score, comboMultiplier, points, level });
         playTone(460 + comboMultiplier * 45, 90, 0.025, "square");
 
         const plusText = this.add.text(star.x, star.y - 20, `+${points}`, {
@@ -391,6 +415,10 @@
     }
 
     function preload(this: Phaser.Scene) {
+        console.log("[GameDebug] preload start");
+        this.load.on("start", () => console.log("[GameDebug] asset load start"));
+        this.load.on("complete", () => console.log("[GameDebug] asset load complete"));
+        this.load.on("loaderror", (file: unknown) => console.error("[GameDebug] asset load error", file));
         this.load.image("sky", "./newsky.png");
         this.load.image("sky-old", "./sky.png");
         this.load.image("cityline", "./buildingpixelated.png");
@@ -404,6 +432,7 @@
     }
 
     function create(this: Phaser.Scene) {
+        console.log("[GameDebug] create start");
         sceneRef = this;
         background = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, "sky");
         farLayer = this.add.tileSprite(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30, GAME_WIDTH, GAME_HEIGHT, "sky-old");
@@ -424,6 +453,7 @@
         applyLevelTheme(this, true);
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(bombs, platforms);
+        console.log("[GameDebug] create complete");
     }
 
     function update() {
@@ -468,7 +498,19 @@
     }
 
     onMount(() => {
+        console.log("[GameDebug] onMount start");
         resetSessionState();
+        runSanityChecks();
+
+        onWindowError = (event: ErrorEvent) => {
+            console.error("[GameDebug] window error", event.error ?? event.message);
+        };
+        onUnhandledRejection = (event: PromiseRejectionEvent) => {
+            console.error("[GameDebug] unhandled rejection", event.reason);
+        };
+        window.addEventListener("error", onWindowError);
+        window.addEventListener("unhandledrejection", onUnhandledRejection);
+
         game = new Phaser.Game({
             type: Phaser.AUTO,
             width: GAME_WIDTH,
@@ -487,9 +529,28 @@
                 update,
             },
         });
+        console.log("[GameDebug] Phaser.Game created", game);
+
+        debugTimerId = window.setTimeout(() => {
+            if (!sceneRef) {
+                console.error("[GameDebug] Scene did not initialize within 3s.");
+            } else {
+                console.log("[GameDebug] Scene initialized successfully.");
+            }
+        }, 3000);
     });
 
     onDestroy(() => {
+        console.log("[GameDebug] onDestroy");
+        if (debugTimerId) {
+            clearTimeout(debugTimerId);
+        }
+        if (onWindowError) {
+            window.removeEventListener("error", onWindowError);
+        }
+        if (onUnhandledRejection) {
+            window.removeEventListener("unhandledrejection", onUnhandledRejection);
+        }
         if (game) {
             game.destroy(true);
             game = null;
