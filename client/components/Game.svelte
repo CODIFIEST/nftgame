@@ -367,7 +367,10 @@
             onComplete: () => plusText.destroy(),
         });
 
-        const particles = this.add.particles(star.x, star.y, "star", {
+        const particles = this.add.particles("star");
+        particles.createEmitter({
+            x: star.x,
+            y: star.y,
             speed: { min: 45, max: 140 },
             scale: { start: 0.15, end: 0 },
             lifespan: 400,
