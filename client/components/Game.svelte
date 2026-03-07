@@ -44,6 +44,9 @@
     import { playerImage } from "../src/stores/playerImage";
     import playerName from "../src/stores/playername";
     import { push } from "svelte-spa-router";
+    import RunStartOverlay from "./RunStartOverlay.svelte";
+    import PauseOverlay from "./PauseOverlay.svelte";
+    import GameOptionsPanel from "./GameOptionsPanel.svelte";
 
     type BombStyle = {
         tint: number;
@@ -605,7 +608,7 @@
         });
     }
 
-    function syncBombCount(scene: Phaser.Scene) {
+    function syncBombCount() {
         const target = activeLevelConfig().targetBombs;
         const currentCount = bombs.countActive(true);
         const missing = Math.max(0, target - currentCount);
@@ -759,7 +762,7 @@
 
         const finalizeSpawns = () => {
             resetStars();
-            syncBombCount(scene);
+            syncBombCount();
             enforceBombSafeZone(config.bombSpeed);
         };
 
@@ -782,7 +785,7 @@
                     ease: "Sine.easeInOut",
                 });
             }
-            syncBombCount(scene);
+            syncBombCount();
             enforceBombSafeZone(config.bombSpeed);
         } else {
             buildPlatforms(scene, config.platformLayout);
@@ -790,7 +793,7 @@
             if (!options.preservePlayer) {
                 placePlayerAtLevelStart();
             }
-            syncBombCount(scene);
+            syncBombCount();
             enforceBombSafeZone(config.bombSpeed);
         }
         uiLevel = level;
@@ -993,7 +996,7 @@
                 });
             } else {
                 resetStars();
-                syncBombCount(this);
+                syncBombCount();
             }
         }
     }
@@ -1324,16 +1327,7 @@
         </button>
     </div>
     {#if showOptions}
-        <div class="options-panel">
-            <label>
-                <input type="checkbox" bind:checked={reducedMotion} />
-                Reduced motion
-            </label>
-            <label>
-                <input type="checkbox" bind:checked={leftHandedMobileControls} />
-                Left-handed controls
-            </label>
-        </div>
+        <GameOptionsPanel bind:reducedMotion bind:leftHandedMobileControls />
     {/if}
     <div class="hud">
         <div class="hud-card player-card">
@@ -1379,24 +1373,11 @@
     {/if}
 
     {#if showStartOverlay}
-        <div class="start-overlay">
-            <div class="start-card">
-                <h2>Ready To Run</h2>
-                <p>Collect stars, build combo, avoid bombs.</p>
-                <p class="help">Desktop: arrow keys. Mobile: on-screen controls.</p>
-                <button on:click={beginRun}>Start Run</button>
-            </div>
-        </div>
+        <RunStartOverlay onStart={beginRun} />
     {/if}
 
     {#if isPaused && !showGameOver}
-        <div class="pause-overlay">
-            <div class="pause-card">
-                <h3>Paused</h3>
-                <p>Press Esc or tap resume to continue.</p>
-                <button on:click={togglePause}>Resume</button>
-            </div>
-        </div>
+        <PauseOverlay onResume={togglePause} />
     {/if}
 
     <div class="mobile-controls" class:left-handed={leftHandedMobileControls}>
@@ -1551,28 +1532,6 @@
         background: rgba(19, 40, 70, 0.86);
     }
 
-    .options-panel {
-        position: absolute;
-        top: 154px;
-        right: 16px;
-        z-index: 25;
-        display: grid;
-        gap: 8px;
-        color: #e5efff;
-        font-size: 12px;
-        font-weight: 600;
-        background: rgba(8, 17, 35, 0.86);
-        border: 1px solid rgba(194, 214, 255, 0.34);
-        border-radius: 10px;
-        padding: 10px 12px;
-    }
-
-    .options-panel label {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
     .hud-card {
         background: linear-gradient(155deg, rgba(9, 21, 46, 0.24), rgba(4, 12, 27, 0.18));
         border: 1px solid rgba(219, 234, 255, 0.1);
@@ -1677,58 +1636,6 @@
         place-items: center;
         background: rgba(8, 12, 20, 0.76);
         backdrop-filter: blur(2px);
-    }
-
-    .start-overlay,
-    .pause-overlay {
-        position: absolute;
-        inset: 0;
-        z-index: 45;
-        display: grid;
-        place-items: center;
-        background: rgba(8, 12, 20, 0.72);
-        backdrop-filter: blur(2px);
-    }
-
-    .start-card,
-    .pause-card {
-        width: min(420px, 90vw);
-        border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        background: linear-gradient(165deg, rgba(20, 32, 55, 0.98), rgba(8, 14, 28, 0.95));
-        padding: 20px;
-        color: #eaf2ff;
-        text-align: center;
-        display: grid;
-        gap: 8px;
-    }
-
-    .start-card h2,
-    .pause-card h3 {
-        margin: 0;
-        color: #ffedc6;
-    }
-
-    .start-card p,
-    .pause-card p {
-        margin: 0;
-    }
-
-    .start-card .help {
-        color: #a9c2e3;
-        font-size: 13px;
-    }
-
-    .start-card button,
-    .pause-card button {
-        border: none;
-        border-radius: 10px;
-        background: linear-gradient(140deg, #ffd37f, #ffbf63);
-        color: #1f1a0f;
-        font-weight: 700;
-        padding: 10px 16px;
-        cursor: pointer;
-        margin-top: 6px;
     }
 
     .game-over-card {
