@@ -35,92 +35,117 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = __importDefault(require("express"));
-// import fs from "fs"
+exports.createApp = void 0;
 const cors_1 = __importDefault(require("cors"));
-// import { PlayerScore } from "../../client/src/domain/playerscore";
-// Import the functions you need from the SDKs you need
+const dotenv = __importStar(require("dotenv"));
+const express_1 = __importDefault(require("express"));
 const app_1 = require("firebase/app");
 const firestore_1 = require("firebase/firestore");
-const dotenv = __importStar(require("dotenv"));
+const season_1 = require("./season");
 dotenv.config();
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-// Your web app's Firebase configuration
-// Your web app's Firebase configuration
 const firebaseConfig = {
     apiKey: process.env.apiKey,
     authDomain: process.env.authDomain,
     projectId: process.env.projectId,
     storageBucket: process.env.storageBucket,
     messagingSenderId: process.env.messagingSenderId,
-    appId: process.env.appId
+    appId: process.env.appId,
 };
-// Initialize Firebase
 const dbApp = (0, app_1.initializeApp)(firebaseConfig);
 const database = (0, firestore_1.getFirestore)(dbApp);
-const app = (0, express_1.default)();
-app.use(express_1.default.json());
-app.use((0, cors_1.default)());
-function getCurrentSeason(date = new Date()) {
-    const year = date.getUTCFullYear();
-    const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
-    return `${year}-Q${quarter}`;
-}
-app.get("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let cleanData = [];
-    const currentSeason = getCurrentSeason();
-    console.log('getting scores');
-    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "23mayhighscores"));
-    allScores.forEach((item) => {
-        let score = item.data();
-        if (score.season !== currentSeason) {
-            return;
-        }
-        score.id = item.id;
-        cleanData.push(score);
-    });
-    // const scores = fs.readFileSync('./highscores.json')
-    res.send(cleanData);
-}));
-app.get("/scores/all-time", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let cleanData = [];
-    console.log('getting all-time scores');
-    const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, "23mayhighscores"));
-    allScores.forEach((item) => {
-        let score = item.data();
-        score.id = item.id;
-        cleanData.push(score);
-    });
-    res.send(cleanData);
-}));
-app.post("/scores", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // const scores: PlayerScore[] = JSON.parse(fs.readFileSync('./highscores.json') as any as string)
-    const token = req.body.token;
-    const imageURL = req.body.imageURL;
-    const playerName = req.body.playerName;
-    const score = req.body.score;
-    const currentSeason = getCurrentSeason();
-    // try {
-    //     validateUserInput(name, platform, releaseYear, genre, ESRBrating, goodGame)
-    // } catch (err) {
-    //     res.status(404).send({
-    //         error: err.message
-    //     });
-    //     return;
-    // }
-    const player1score = {
-        token: token,
-        imageURL: imageURL,
-        playerName: playerName,
-        score: score,
-        season: currentSeason,
-        id: ""
+const SCORE_COLLECTION = "23mayhighscores";
+function normalizeScoreRecord(raw, id) {
+    var _a, _b, _c, _d;
+    const data = (raw !== null && raw !== void 0 ? raw : {});
+    if (typeof data.score !== "number" || Number.isNaN(data.score)) {
+        return null;
+    }
+    return {
+        token: String((_a = data.token) !== null && _a !== void 0 ? _a : ""),
+        imageURL: String((_b = data.imageURL) !== null && _b !== void 0 ? _b : ""),
+        playerName: String((_c = data.playerName) !== null && _c !== void 0 ? _c : "anonymous"),
+        score: Math.max(0, Math.floor(data.score)),
+        season: String((_d = data.season) !== null && _d !== void 0 ? _d : (0, season_1.getCurrentSeason)()),
+        id,
     };
-    const newScores = yield (0, firestore_1.addDoc)((0, firestore_1.collection)(database, "23mayhighscores"), player1score);
-    // newScores.push(player1score);
-    // fs.writeFileSync("./highscores.json", JSON.stringify(scores))
-    console.log(`new score saved ${newScores}`);
-    res.send(newScores);
-}));
-app.listen(3888);
+}
+function parseIncomingScore(body) {
+    var _a, _b, _c, _d;
+    const payload = (body !== null && body !== void 0 ? body : {});
+    const scoreValue = Number((_a = payload.score) !== null && _a !== void 0 ? _a : 0);
+    if (!Number.isFinite(scoreValue) || scoreValue < 0) {
+        throw new Error("Score must be a non-negative number.");
+    }
+    const playerName = String((_b = payload.playerName) !== null && _b !== void 0 ? _b : "anonymous").trim() || "anonymous";
+    return {
+        token: String((_c = payload.token) !== null && _c !== void 0 ? _c : ""),
+        imageURL: String((_d = payload.imageURL) !== null && _d !== void 0 ? _d : ""),
+        playerName: playerName.slice(0, 32),
+        score: Math.floor(scoreValue),
+        season: (0, season_1.getCurrentSeason)(),
+    };
+}
+function readAllScores() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const cleanData = [];
+        const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, SCORE_COLLECTION));
+        allScores.forEach((item) => {
+            const normalized = normalizeScoreRecord(item.data(), item.id);
+            if (normalized) {
+                cleanData.push(normalized);
+            }
+        });
+        return cleanData;
+    });
+}
+function createApp() {
+    const app = (0, express_1.default)();
+    app.use(express_1.default.json());
+    app.use((0, cors_1.default)());
+    app.get("/health", (_req, res) => {
+        res.status(200).send({
+            ok: true,
+            season: (0, season_1.getCurrentSeason)(),
+            timestamp: new Date().toISOString(),
+        });
+    });
+    app.get("/scores", (req, res) => __awaiter(this, void 0, void 0, function* () {
+        try {
+            const season = typeof req.query.season === "string" && req.query.season.trim()
+                ? req.query.season.trim()
+                : (0, season_1.getCurrentSeason)();
+            const allScores = yield readAllScores();
+            const seasonScores = allScores.filter((score) => score.season === season);
+            res.status(200).send(seasonScores);
+        }
+        catch (error) {
+            res.status(500).send({ error: "Failed to load scores." });
+        }
+    }));
+    app.get("/scores/all-time", (_req, res) => __awaiter(this, void 0, void 0, function* () {
+        try {
+            const scores = yield readAllScores();
+            res.status(200).send(scores);
+        }
+        catch (error) {
+            res.status(500).send({ error: "Failed to load all-time scores." });
+        }
+    }));
+    app.post("/scores", (req, res) => __awaiter(this, void 0, void 0, function* () {
+        try {
+            const playerScore = parseIncomingScore(req.body);
+            const created = yield (0, firestore_1.addDoc)((0, firestore_1.collection)(database, SCORE_COLLECTION), playerScore);
+            res.status(201).send(Object.assign(Object.assign({}, playerScore), { id: created.id }));
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : "Invalid payload.";
+            res.status(400).send({ error: message });
+        }
+    }));
+    return app;
+}
+exports.createApp = createApp;
+if (process.env.NODE_ENV !== "test") {
+    const app = createApp();
+    app.listen(3888);
+}

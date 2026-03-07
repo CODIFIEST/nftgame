@@ -7,8 +7,9 @@
   "description": "The backend Express server written in Node.js for our app.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "start": "node dist/api/index.js"
   },
   "author": "",
   "license": "ISC",
