@@ -38,9 +38,9 @@
     import { clearHudPulseTimers, triggerHudPulse as triggerHudPulseRuntime } from "../src/game/hudPulse";
     import { applyLevelTheme as applyLevelThemeRuntime, type LevelThemeOptions } from "../src/game/levelTheme";
     import { levelBanner, normalizePlayerSprite, resetStars as resetStarsForLevel } from "../src/game/levelVisuals";
+    import { advanceAfterStarClear } from "../src/game/progressionRuntime";
     import { nextComboMultiplier, pointsForCombo, renderStarCollectFx } from "../src/game/starCollect";
     import {
-        anchorXForLevel,
         buildLevels,
         clamp,
         type LevelConfig,
@@ -52,7 +52,6 @@
         getCurrentAnchorLedge,
         getCurrentAnchorPlatform,
         placePlayerAtLevelStart,
-        sequentialRevealDurationMs,
     } from "../src/game/platformRuntime";
     import {
         centerZoomedCamera,
@@ -377,78 +376,32 @@
         renderStarCollectFx(this, star, points);
 
         if (stars.countActive(true) === 0) {
-            if (level < LEVELS.length) {
-                if (isLevelTransitioning) {
-                    return;
-                }
-                isLevelTransitioning = true;
-                player.setVelocity(0, 0);
-                const anchor = getCurrentAnchorLedge(player, platforms);
-                const anchorPlatform = getCurrentAnchorPlatform(player, platforms);
-                const nextLevel = level + 1;
-                const desiredAnchorX = anchorXForLevel(nextLevel, GAME_WIDTH);
-                const transitionDuration = 2700;
-                const platformObjects = (platforms.getChildren() as Phaser.Physics.Arcade.Image[]) ?? [];
-                const platformStartX = platformObjects.map((platform) => platform.x);
-                const playerStartX = player.x;
-                const playerStartY = player.y;
-                const anchorPlatformStartX = anchorPlatform?.x ?? playerStartX;
-                const anchorPlatformStartY = anchorPlatform?.y ?? playerStartY + 90;
-                const transitionShift = anchorPlatformStartX - desiredAnchorX;
-                const playerOffsetX = playerStartX - anchorPlatformStartX;
-                const playerOffsetY = playerStartY - anchorPlatformStartY;
-                this.cameras.main.flash(180, 255, 250, 210, false);
-                this.tweens.add({
-                    targets: this.cameras.main,
-                    zoom: BASE_CAMERA_ZOOM + 0.06,
-                    duration: 140,
-                    yoyo: true,
-                    ease: "Sine.easeInOut",
-                });
-                playTone(780, 120, 0.03, "triangle");
-                playTone(920, 120, 0.024, "triangle");
-                this.physics.pause();
-                applyBackgroundSection(this, background, nextLevel, true);
-                this.tweens.addCounter({
-                    from: 0,
-                    to: 1,
-                    duration: transitionDuration,
-                    ease: "Sine.easeInOut",
-                    onUpdate: (tween) => {
-                        const t = tween.getValue();
-                        platformObjects.forEach((platform, index) => {
-                            platform.x = platformStartX[index] - transitionShift * t;
-                            platform.refreshBody();
-                        });
-                        if (anchorPlatform) {
-                            player.x = anchorPlatform.x + playerOffsetX;
-                            player.y = anchorPlatform.y + playerOffsetY;
-                        } else {
-                            player.x = playerStartX - transitionShift * t;
-                            player.y = playerStartY;
-                        }
-                    },
-                    onComplete: () => {
-                        level = nextLevel;
-                        const anchoredX = desiredAnchorX;
-                        const revealMs = sequentialRevealDurationMs(activeLevelConfig().platformLayout.length);
-                        applyLevelTheme(this, true, {
-                            preservePlayer: true,
-                            anchor: { x: anchoredX, y: anchor.y },
-                            skipBackgroundPan: true,
-                            sequentialReveal: true,
-                        });
-                        this.time.delayedCall(revealMs + 80, () => {
-                            player.setVelocity(0, 0);
-                            this.physics.resume();
-                            isLevelTransitioning = false;
-                        });
-                    },
-                });
-            } else {
-                resetStars();
-                syncBombCount();
-            }
+            advanceAfterStarClear({
+                scene: this,
+                level,
+                levels: LEVELS,
+                isLevelTransitioning,
+                setIsLevelTransitioning: (value) => {
+                    isLevelTransitioning = value;
+                },
+                setLevel: (value) => {
+                    level = value;
+                },
+                player,
+                platforms,
+                gameWidth: GAME_WIDTH,
+                baseCameraZoom: BASE_CAMERA_ZOOM,
+                background,
+                applyBackgroundSection,
+                getCurrentAnchorLedge,
+                getCurrentAnchorPlatform,
+                playTone,
+                applyLevelTheme,
+                onFinalLevelCleared: () => {
+                    resetStars();
+                    syncBombCount();
+                },
+            });
         }
     }
 
