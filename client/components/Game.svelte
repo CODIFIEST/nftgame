@@ -1422,7 +1422,7 @@
             height: GAME_HEIGHT,
             parent: GAME_CONTAINER_ID,
             scale: {
-                mode: Phaser.Scale.ENVELOP,
+                mode: Phaser.Scale.FIT,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
                 width: GAME_WIDTH,
                 height: GAME_HEIGHT,
@@ -1613,8 +1613,9 @@
 
     .game-canvas :global(canvas) {
         display: block;
-        width: 100% !important;
-        height: 100% !important;
+        max-width: 100%;
+        max-height: 100%;
+        margin: 0 auto;
     }
 
     .hud {
@@ -1645,13 +1646,13 @@
     }
 
     .hud-card {
-        background: linear-gradient(155deg, rgba(9, 21, 46, 0.84), rgba(4, 12, 27, 0.76));
-        border: 1px solid var(--ui-border);
+        background: linear-gradient(155deg, rgba(9, 21, 46, 0.42), rgba(4, 12, 27, 0.34));
+        border: 1px solid rgba(219, 234, 255, 0.16);
         border-radius: 12px;
         padding: 8px 12px 9px;
         display: grid;
         gap: 2px;
-        backdrop-filter: blur(3px);
+        backdrop-filter: blur(2px);
     }
 
     .player-card .value {
