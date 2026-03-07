@@ -54,6 +54,24 @@ const firebaseConfig = {
 const dbApp = (0, app_1.initializeApp)(firebaseConfig);
 const database = (0, firestore_1.getFirestore)(dbApp);
 const SCORE_COLLECTION = "23mayhighscores";
+const ALLOWED_ORIGINS = [
+    "https://nftgame-dusky.vercel.app",
+    "https://nftgame-server.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:4173",
+];
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+            callback(null, true);
+            return;
+        }
+        callback(null, false);
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+};
 function normalizeScoreRecord(raw, id) {
     var _a, _b, _c, _d;
     const data = (raw !== null && raw !== void 0 ? raw : {});
@@ -101,7 +119,8 @@ function readAllScores() {
 function createApp() {
     const app = (0, express_1.default)();
     app.use(express_1.default.json());
-    app.use((0, cors_1.default)());
+    app.use((0, cors_1.default)(corsOptions));
+    app.options("*", (0, cors_1.default)(corsOptions));
     app.get("/health", (_req, res) => {
         res.status(200).send({
             ok: true,
@@ -145,7 +164,8 @@ function createApp() {
     return app;
 }
 exports.createApp = createApp;
-if (process.env.NODE_ENV !== "test") {
-    const app = createApp();
+const app = createApp();
+exports.default = app;
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
     app.listen(3888);
 }
