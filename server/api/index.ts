@@ -6,7 +6,8 @@ import { addDoc, collection, getDocs, getFirestore, limit, orderBy, query, where
 import { getCurrentSeason } from "./season";
 import { HighScore } from "../domain/highscore";
 import { SlidingWindowRateLimiter } from "./rateLimit";
-import { normalizeScoreRecord, parseIncomingScore, parseLimit } from "./scoreValidation";
+import { consumeRunTicketOrThrow, normalizeScoreRecord, parseIncomingScore, parseLimit } from "./scoreValidation";
+import { RunTicketStore } from "./runTicket";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ const ALLOWED_ORIGINS = [
     "http://localhost:4173",
 ];
 const postRateLimiter = new SlidingWindowRateLimiter();
+const runTicketStore = new RunTicketStore();
 
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
@@ -112,6 +114,12 @@ export function createApp() {
         });
     });
 
+    app.post("/run-ticket", (req, res) => {
+        const ipKey = req.ip || req.socket.remoteAddress || "unknown";
+        const ticket = runTicketStore.issue(ipKey);
+        res.status(201).send(ticket);
+    });
+
     app.get("/scores", async (req, res) => {
         try {
             const maxRows = parseLimit(req.query.limit, DEFAULT_QUERY_LIMIT);
@@ -143,6 +151,7 @@ export function createApp() {
                 return;
             }
             const playerScore = parseIncomingScore(req.body);
+            consumeRunTicketOrThrow(runTicketStore, playerScore.ticketId ?? "", ipKey);
             const created = await addDoc(collection(database, SCORE_COLLECTION), playerScore);
             res.status(201).send({
                 ...playerScore,

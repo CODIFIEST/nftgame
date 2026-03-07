@@ -5,6 +5,12 @@ export type ScorePayload = {
     imageURL: string;
     score: number;
     playerName: string;
+    ticketId: string;
+    runStartedAt: string;
+    runEndedAt: string;
+    collectedStars: number;
+    maxCombo: number;
+    maxLevelReached: number;
     season?: string;
     createdAt?: string;
 };
@@ -16,9 +22,12 @@ const DEFAULT_LAST_SYNC_KEY = "nftgame.lastScoreSyncAt";
 
 function dedupeKey(payload: ScorePayload): string {
     return [
+        payload.ticketId || "ticketless",
         payload.token || "anonymous",
         payload.score,
         payload.playerName || "anonymous",
+        payload.runStartedAt || "start-unknown",
+        payload.runEndedAt || "end-unknown",
         payload.season || "seasonless",
         payload.createdAt || "at-unknown",
     ].join("|");

@@ -6,6 +6,7 @@ type AdvanceAfterClearArgs = {
     scene: Phaser.Scene;
     level: number;
     levels: LevelConfig[];
+    ensureLevelExists: (levelNumber: number) => void;
     isLevelTransitioning: boolean;
     setIsLevelTransitioning: (value: boolean) => void;
     setLevel: (value: number) => void;
@@ -41,14 +42,9 @@ type AdvanceAfterClearArgs = {
             sequentialReveal?: boolean;
         },
     ) => void;
-    onFinalLevelCleared: () => void;
 };
 
 export function advanceAfterStarClear(args: AdvanceAfterClearArgs): void {
-    if (args.level >= args.levels.length) {
-        args.onFinalLevelCleared();
-        return;
-    }
     if (args.isLevelTransitioning) {
         return;
     }
@@ -58,6 +54,7 @@ export function advanceAfterStarClear(args: AdvanceAfterClearArgs): void {
     const anchor = args.getCurrentAnchorLedge(args.player, args.platforms);
     const anchorPlatform = args.getCurrentAnchorPlatform(args.player, args.platforms);
     const nextLevel = args.level + 1;
+    args.ensureLevelExists(nextLevel);
     const desiredAnchorX = anchorXForLevel(nextLevel, args.gameWidth);
     const transitionDuration = 2700;
     const platformObjects = (args.platforms.getChildren() as Phaser.Physics.Arcade.Image[]) ?? [];
@@ -103,6 +100,7 @@ export function advanceAfterStarClear(args: AdvanceAfterClearArgs): void {
         },
         onComplete: () => {
             args.setLevel(nextLevel);
+            args.ensureLevelExists(nextLevel);
             const revealMs = sequentialRevealDurationMs(args.levels[nextLevel - 1].platformLayout.length);
             args.applyLevelTheme(args.scene, true, {
                 preservePlayer: true,

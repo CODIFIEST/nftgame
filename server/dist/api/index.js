@@ -44,6 +44,7 @@ const firestore_1 = require("firebase/firestore");
 const season_1 = require("./season");
 const rateLimit_1 = require("./rateLimit");
 const scoreValidation_1 = require("./scoreValidation");
+const runTicket_1 = require("./runTicket");
 dotenv.config();
 const firebaseConfig = {
     apiKey: process.env.apiKey,
@@ -64,6 +65,7 @@ const ALLOWED_ORIGINS = [
     "http://localhost:4173",
 ];
 const postRateLimiter = new rateLimit_1.SlidingWindowRateLimiter();
+const runTicketStore = new runTicket_1.RunTicketStore();
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || ALLOWED_ORIGINS.includes(origin)) {
@@ -147,6 +149,11 @@ function createApp() {
             timestamp: new Date().toISOString(),
         });
     });
+    app.post("/run-ticket", (req, res) => {
+        const ipKey = req.ip || req.socket.remoteAddress || "unknown";
+        const ticket = runTicketStore.issue(ipKey);
+        res.status(201).send(ticket);
+    });
     app.get("/scores", (req, res) => __awaiter(this, void 0, void 0, function* () {
         try {
             const maxRows = (0, scoreValidation_1.parseLimit)(req.query.limit, DEFAULT_QUERY_LIMIT);
@@ -171,6 +178,7 @@ function createApp() {
         }
     }));
     app.post("/scores", (req, res) => __awaiter(this, void 0, void 0, function* () {
+        var _a;
         try {
             const ipKey = req.ip || req.socket.remoteAddress || "unknown";
             if (!postRateLimiter.consume(ipKey)) {
@@ -178,6 +186,7 @@ function createApp() {
                 return;
             }
             const playerScore = (0, scoreValidation_1.parseIncomingScore)(req.body);
+            (0, scoreValidation_1.consumeRunTicketOrThrow)(runTicketStore, (_a = playerScore.ticketId) !== null && _a !== void 0 ? _a : "", ipKey);
             const created = yield (0, firestore_1.addDoc)((0, firestore_1.collection)(database, SCORE_COLLECTION), playerScore);
             res.status(201).send(Object.assign(Object.assign({}, playerScore), { id: created.id }));
         }

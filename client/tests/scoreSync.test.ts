@@ -31,6 +31,12 @@ const payload: ScorePayload = {
     imageURL: "https://example.com/panda.png",
     score: 100,
     playerName: "tester",
+    ticketId: "ticket-1",
+    runStartedAt: "2026-03-01T00:00:00.000Z",
+    runEndedAt: "2026-03-01T00:01:00.000Z",
+    collectedStars: 20,
+    maxCombo: 4,
+    maxLevelReached: 3,
     season: "2026-Q1",
     createdAt: "2026-03-01T00:00:00.000Z",
 };

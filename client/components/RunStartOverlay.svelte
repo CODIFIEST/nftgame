@@ -1,5 +1,5 @@
 <script lang="ts">
-    export let onStart: () => void;
+    export let onStart: () => void | Promise<void>;
 </script>
 
 <div class="start-overlay">

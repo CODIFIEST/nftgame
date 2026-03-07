@@ -69,6 +69,7 @@
     import GameOptionsPanel from "./GameOptionsPanel.svelte";
 
     const LEVELS: LevelConfig[] = buildLevels(TOTAL_LEVELS, GAME_WIDTH);
+    const LEVEL_EXTENSION_CHUNK = 40;
     const API_BASE_URL = getApiBaseUrl();
 
     let game: Phaser.Game | null = null;
@@ -129,6 +130,12 @@
     let reducedMotion = false;
     let leftHandedMobileControls = false;
     let onWindowKeydown: ((event: KeyboardEvent) => void) | undefined;
+    let runTicketId = "";
+    let runStartedAtIso = "";
+    let collectedStars = 0;
+    let maxComboReached = 1;
+    let maxLevelReached = 1;
+    let runTicketSupportAvailable: boolean | null = null;
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
     $: if (typeof window !== "undefined") {
@@ -136,14 +143,50 @@
     }
 
     function activeLevelConfig(): LevelConfig {
+        ensureLevelExists(level);
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
     }
 
-    function beginRun() {
+    function ensureLevelExists(levelNumber: number) {
+        if (levelNumber <= LEVELS.length) {
+            return;
+        }
+        const target = Math.max(levelNumber, LEVELS.length + LEVEL_EXTENSION_CHUNK);
+        const generated = buildLevels(target, GAME_WIDTH);
+        LEVELS.push(...generated.slice(LEVELS.length));
+    }
+
+    async function requestRunTicket(): Promise<void> {
+        if (runTicketSupportAvailable === false) {
+            return;
+        }
+        try {
+            const response = await axios.post<{ ticketId: string; issuedAt: string }>(
+                `${API_BASE_URL}/run-ticket`,
+                {},
+                { timeout: 8000 },
+            );
+            runTicketId = response.data.ticketId ?? "";
+            runTicketSupportAvailable = true;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+                runTicketSupportAvailable = false;
+                return;
+            }
+            console.error("[GameDebug] failed to request run ticket", error);
+        }
+    }
+
+    async function beginRun() {
         if (!sceneRef || hasRunStarted || isDead) {
             return;
         }
+        if (!runTicketId) {
+            await requestRunTicket();
+        }
         hasRunStarted = true;
+        runStartedAtIso = new Date().toISOString();
+        maxLevelReached = Math.max(maxLevelReached, level);
         showStartOverlay = false;
         isPaused = false;
         sceneRef.physics.resume();
@@ -208,6 +251,11 @@
         jumpPressedLastFrame = false;
         lastNearMissShakeAt = 0;
         isLevelTransitioning = false;
+        runTicketId = "";
+        runStartedAtIso = "";
+        collectedStars = 0;
+        maxComboReached = 1;
+        maxLevelReached = 1;
     }
 
     function syncBombCount() {
@@ -250,6 +298,7 @@
     }
 
     function applyLevelTheme(scene: Phaser.Scene, showBanner = false, options: LevelThemeOptions = {}) {
+        ensureLevelExists(level);
         platforms = applyLevelThemeRuntime({
             scene,
             level,
@@ -292,11 +341,29 @@
         const selectedNft = $player1nft ?? getPersistedNft(PLAYER_NFT_KEY);
         submittingScore = true;
         scoreSaveError = "";
-        const payload = {
+        if (runTicketSupportAvailable !== false && !runTicketId) {
+            await requestRunTicket();
+        }
+        if (runTicketSupportAvailable !== false && !runTicketId) {
+            scoreSaveError = "Unable to verify run. Connect and retry.";
+            submittingScore = false;
+            return;
+        }
+        const runEndedAt = new Date().toISOString();
+        const payload: ScorePayload = {
             token: selectedNft?.tokenAddress ?? "",
             imageURL: selectedNft?.imageURL ?? "",
             score,
             playerName: $playerName ?? "anonymous",
+            ticketId: runTicketSupportAvailable === false ? "legacy-ticketless" : runTicketId,
+            runStartedAt:
+                runTicketSupportAvailable === false
+                    ? new Date(Date.now() - 20_000).toISOString()
+                    : runStartedAtIso || new Date(Date.now() - 20_000).toISOString(),
+            runEndedAt,
+            collectedStars: Math.max(1, collectedStars),
+            maxCombo: Math.max(1, maxComboReached),
+            maxLevelReached: Math.max(1, maxLevelReached),
         };
         try {
             await scoreQueue.postWithRetry(payload, postScorePayload, SCORE_POST_TIMEOUT_MS, SCORE_RETRY_DELAYS_MS);
@@ -367,6 +434,8 @@
 
         const points = pointsForCombo(comboMultiplier);
         score += points;
+        collectedStars += 1;
+        maxComboReached = Math.max(maxComboReached, comboMultiplier);
         uiScore = score;
         uiCombo = comboMultiplier;
         triggerHudPulse("score");
@@ -380,12 +449,14 @@
                 scene: this,
                 level,
                 levels: LEVELS,
+                ensureLevelExists,
                 isLevelTransitioning,
                 setIsLevelTransitioning: (value) => {
                     isLevelTransitioning = value;
                 },
                 setLevel: (value) => {
                     level = value;
+                    maxLevelReached = Math.max(maxLevelReached, value);
                 },
                 player,
                 platforms,
@@ -397,10 +468,6 @@
                 getCurrentAnchorPlatform,
                 playTone,
                 applyLevelTheme,
-                onFinalLevelCleared: () => {
-                    resetStars();
-                    syncBombCount();
-                },
             });
         }
     }
@@ -608,6 +675,7 @@
         });
         refreshPendingSyncCount();
         void flushPendingScores();
+        void requestRunTicket();
 
         onWindowOnline = () => {
             void flushPendingScores();
@@ -627,7 +695,7 @@
                 togglePause();
             }
             if (event.key === "Enter" && showStartOverlay && !hasRunStarted) {
-                beginRun();
+                void beginRun();
             }
         };
         window.addEventListener("error", onWindowError);
@@ -740,7 +808,7 @@
         </div>
         <div class="hud-card" class:level-pop={levelPulse}>
             <span class="label">Level</span>
-            <span class="value">{uiLevel}/{LEVELS.length}</span>
+            <span class="value">{uiLevel}/∞</span>
             <span class="sub">{levelThemeName}</span>
         </div>
         <div class="hud-card" class:score-pop={scorePulse}>
