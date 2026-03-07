@@ -23,3 +23,16 @@ VITE_QUICKNODE_APK=https://your-quicknode-endpoint
 1. A form that lets a user type their name, their age, and their ethereum address, then sends it to the backend to be saved.
 
 2. A page that displays all the users in a grid.
+
+# Run
+1. `npm install`
+2. `npm run dev`
+
+# Quality checks
+1. `npm run check`
+2. `npm run build`
+
+# Runtime notes
+1. `VITE_API_BASE_URL` can override backend URL. Defaults to production server URL.
+2. Game route is lazy-loaded to reduce initial bundle impact.
+3. Score posting has retry + pending queue sync with manual sync button in-game.

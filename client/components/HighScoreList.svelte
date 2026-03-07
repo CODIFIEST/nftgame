@@ -1,9 +1,10 @@
 <script lang="ts">
     import axios from "axios";
     import { onMount } from "svelte";
-    import { NFTType } from "../../server/domain/nft";
+    import { getApiBaseUrl } from "../src/config/runtime";
+    import { trackError, trackWarn } from "../src/game/telemetry";
     import highscores from "../src/stores/highscores";
-    const API_BASE_URL = "https://nftgame-server.vercel.app";
+    const API_BASE_URL = getApiBaseUrl();
     const currentDate = new Date();
     const currentSeason = `${currentDate.getUTCFullYear()}-Q${Math.floor(currentDate.getUTCMonth() / 3) + 1}`;
     let seasonScores = [];
@@ -11,8 +12,12 @@
     let allTimeFallbackUsed = false;
 
     async function getSeasonScores() {
-        const result = await axios.get(`${API_BASE_URL}/scores`, { timeout: 10000 });
-        console.log('season results', result.data)
+        const result = await axios.get(`${API_BASE_URL}/scores`, {
+            timeout: 10000,
+            params: {
+                season: currentSeason,
+            },
+        });
         return result.data
         
     }
@@ -20,12 +25,16 @@
     async function getAllTimeScores() {
         try {
             const result = await axios.get(`${API_BASE_URL}/scores/all-time`, { timeout: 10000 });
-            console.log('all-time results', result.data)
             allTimeFallbackUsed = false;
             return result.data
         } catch (error) {
-            console.warn("all-time endpoint unavailable, falling back to current season scores", error);
-            const fallback = await axios.get(`${API_BASE_URL}/scores`, { timeout: 10000 });
+            trackWarn("all_time_scores_endpoint_unavailable", { apiBase: API_BASE_URL });
+            const fallback = await axios.get(`${API_BASE_URL}/scores`, {
+                timeout: 10000,
+                params: {
+                    season: currentSeason,
+                },
+            });
             allTimeFallbackUsed = true;
             return fallback.data;
         }
@@ -51,9 +60,10 @@
             const fetchedSeasonScores = await getSeasonScores();
             seasonScores = getTopUniqueScores(fetchedSeasonScores);
             highscores.set(seasonScores);
-            console.log('season highscores', seasonScores);
         } catch (error) {
-            console.error("failed to load season highscores", error);
+            trackError("season_highscores_load_failed", {
+                message: error instanceof Error ? error.message : String(error),
+            });
             seasonScores = [];
             highscores.set([]);
         }
@@ -61,9 +71,10 @@
         try {
             const fetchedAllTimeScores = await getAllTimeScores();
             allTimeScores = getTopUniqueScores(fetchedAllTimeScores);
-            console.log('all-time highscores', allTimeScores);
         } catch (error) {
-            console.error("failed to load all-time highscores", error);
+            trackError("all_time_highscores_load_failed", {
+                message: error instanceof Error ? error.message : String(error),
+            });
             allTimeScores = [...seasonScores];
             allTimeFallbackUsed = true;
         }

@@ -2,26 +2,22 @@
     import axios from "axios";
     import * as Phaser from "phaser";
     import { onDestroy, onMount } from "svelte";
+    import { assertGameRuntimeConfig, getApiBaseUrl } from "../src/config/runtime";
+    import { ScoreSyncQueue, type ScorePayload } from "../src/game/scoreSync";
+    import { trackError, trackInfo } from "../src/game/telemetry";
+    import {
+        anchorXForLevel,
+        buildLayoutFromAnchor,
+        buildLevels,
+        clamp,
+        type LevelConfig,
+        type PlatformConfig,
+    } from "../src/game/levels";
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
     import { playerImage } from "../src/stores/playerImage";
     import playerName from "../src/stores/playername";
     import { push } from "svelte-spa-router";
-
-    type PlatformConfig = {
-        x: number;
-        y: number;
-        scaleX?: number;
-    };
-
-    type LevelConfig = {
-        title: string;
-        tint: number;
-        platformLayout: PlatformConfig[];
-        starCount: number;
-        targetBombs: number;
-        bombSpeed: number;
-    };
 
     type BombStyle = {
         tint: number;
@@ -37,142 +33,11 @@
         sequentialReveal?: boolean;
     };
 
-    const BASE_LEVEL_THEMES: Pick<LevelConfig, "title" | "tint">[] = [
-        {
-            title: "Rooftop Run",
-            tint: 0x9bd5ff,
-        },
-        {
-            title: "Factory Lift",
-            tint: 0xffd38f,
-        },
-        {
-            title: "Storm Walk",
-            tint: 0xbac3ff,
-        },
-        {
-            title: "Neon Tunnel",
-            tint: 0xff9add,
-        },
-        {
-            title: "Core Breach",
-            tint: 0xff8d8d,
-        },
-    ];
-
-    function clamp(value: number, min: number, max: number): number {
-        return Math.max(min, Math.min(max, value));
-    }
-
-    function rowIndexForLevel(levelNumber: number): number {
-        return Math.floor((levelNumber - 1) / 5);
-    }
-
-    function movesRightForLevel(levelNumber: number): boolean {
-        return rowIndexForLevel(levelNumber) % 2 === 0;
-    }
-
-    function anchorXForLevel(levelNumber: number): number {
-        return movesRightForLevel(levelNumber) ? 160 : GAME_WIDTH - 160;
-    }
-
-    function seededUnit(levelNumber: number, index: number): number {
-        const seed = Math.sin((levelNumber + 1) * 9283 + (index + 1) * 1237) * 43758.5453;
-        return seed - Math.floor(seed);
-    }
-
-    function randomLedgeScale(levelNumber: number, index: number, isAnchor = false): number {
-        const r = seededUnit(levelNumber, index);
-        const min = isAnchor ? 0.56 : 0.34;
-        const max = isAnchor ? 0.78 : 0.62;
-        return min + (max - min) * r;
-    }
-
-    function buildLayoutForLevel(levelNumber: number): PlatformConfig[] {
-        const platformCount = 5 + Math.min(5, Math.floor(levelNumber / 12));
-        const maxStepX = 410;
-        const minStepX = 230;
-        const minY = LEVEL_MIN_Y;
-        const maxY = LEVEL_MAX_Y;
-        const moveRight = movesRightForLevel(levelNumber);
-        const layout: PlatformConfig[] = [];
-
-        let prevX = moveRight ? 180 : GAME_WIDTH - 180;
-        let prevY = 850;
-
-        for (let i = 0; i < platformCount; i += 1) {
-            if (i === 0) {
-                layout.push({ x: prevX, y: prevY, scaleX: randomLedgeScale(levelNumber, i, true) });
-                continue;
-            }
-
-            const progress = i / (platformCount - 1);
-            const baseTargetX = 120 + progress * (GAME_WIDTH - 240);
-            const targetX = (moveRight ? baseTargetX : GAME_WIDTH - baseTargetX) + Phaser.Math.Between(-70, 70);
-            const rawDeltaX = targetX - prevX;
-            const direction = moveRight ? 1 : -1;
-            const deltaX = clamp(Math.abs(rawDeltaX), minStepX, maxStepX) * direction;
-            let nextX = clamp(prevX + deltaX, 110, GAME_WIDTH - 110);
-            if (moveRight) {
-                nextX = Math.max(nextX, prevX + minStepX * 0.66);
-            } else {
-                nextX = Math.min(nextX, prevX - minStepX * 0.66);
-            }
-            nextX = clamp(nextX, 110, GAME_WIDTH - 110);
-
-            // Neutral vertical walk: symmetric random step plus mild pull to center to prevent drift.
-            const centerY = 740;
-            const driftCorrection = (centerY - prevY) * 0.34;
-            const deltaY = Phaser.Math.Between(-90, 90) + driftCorrection;
-            let nextY = prevY + deltaY;
-            nextY = clamp(nextY, minY, maxY);
-
-            layout.push({
-                x: nextX,
-                y: nextY,
-                scaleX: randomLedgeScale(levelNumber, i),
-            });
-
-            prevX = nextX;
-            prevY = nextY;
-        }
-
-        return layout;
-    }
-
-    function buildLayoutFromAnchor(levelNumber: number, anchorX: number, anchorY: number): PlatformConfig[] {
-        const base = buildLayoutForLevel(levelNumber);
-        const first = base[0];
-        const deltaX = anchorX - first.x;
-        const normalizedAnchorY = clamp(anchorY, ANCHOR_MIN_Y, ANCHOR_MAX_Y);
-        const deltaY = normalizedAnchorY - first.y;
-        return base.map((piece) => ({
-            x: clamp(piece.x + deltaX, 110, GAME_WIDTH - 110),
-            y: clamp(piece.y + deltaY, LEVEL_MIN_Y, LEVEL_MAX_Y),
-            scaleX: piece.scaleX,
-        }));
-    }
-
-    function buildLevels(totalLevels: number): LevelConfig[] {
-        const levels: LevelConfig[] = [];
-        for (let levelNumber = 1; levelNumber <= totalLevels; levelNumber += 1) {
-            const theme = BASE_LEVEL_THEMES[(levelNumber - 1) % BASE_LEVEL_THEMES.length];
-            levels.push({
-                title: `${theme.title} ${levelNumber}`,
-                tint: theme.tint,
-                platformLayout: buildLayoutForLevel(levelNumber),
-                starCount: 10 + Math.min(16, Math.floor((levelNumber - 1) / 2)),
-                targetBombs: 1 + Math.min(24, levelNumber - 1),
-                bombSpeed: 140 + Math.min(260, (levelNumber - 1) * 4),
-            });
-        }
-        return levels;
-    }
 
     const GAME_WIDTH = 1400;
     const GAME_HEIGHT = 1000;
     const TOTAL_LEVELS = 100;
-    const LEVELS: LevelConfig[] = buildLevels(TOTAL_LEVELS);
+    const LEVELS: LevelConfig[] = buildLevels(TOTAL_LEVELS, GAME_WIDTH);
     const BASE_CAMERA_ZOOM = 1.06;
     const BACKGROUND_SCALE = 5;
     const BACKGROUND_SECTION_GRID = 5;
@@ -186,17 +51,12 @@
     const JUMP_HOLD_MAX_MS = 210;
     const JUMP_RELEASE_CUTOFF = -120;
     const WORLD_GRAVITY_Y = 320;
-    const API_BASE_URL = "https://nftgame-server.vercel.app";
+    const API_BASE_URL = getApiBaseUrl();
     const PLAYER_BOMB_SAFE_DISTANCE = 260;
-    const PENDING_SCORES_KEY = "nftgame.pendingScores";
     const SCORE_POST_TIMEOUT_MS = 12000;
     const SCORE_RETRY_DELAYS_MS = [700, 1800, 3500];
     const CAMERA_NEAR_MISS_DISTANCE = 135;
     const CAMERA_NEAR_MISS_COOLDOWN_MS = 550;
-    const LEVEL_MIN_Y = 460;
-    const LEVEL_MAX_Y = 860;
-    const ANCHOR_MIN_Y = 650;
-    const ANCHOR_MAX_Y = 860;
     const BOMB_VISIBLE_TOP_Y = 80;
 
     let game: Phaser.Game | null = null;
@@ -219,6 +79,7 @@
     let isDead = false;
 
     let showGameOver = false;
+    let canRestartAfterDeath = false;
     let submittingScore = false;
     let latestScore = 0;
     let didBeatHighScore = false;
@@ -234,7 +95,9 @@
     let jumpHoldTimeMs = 0;
     let jumpPressedLastFrame = false;
     let onWindowOnline: (() => void) | undefined;
+    const scoreQueue = new ScoreSyncQueue();
     let pendingSyncCount = 0;
+    let lastSyncAt: string | null = null;
     let scorePulse = false;
     let comboPulse = false;
     let levelPulse = false;
@@ -419,85 +282,29 @@
         }
     }
 
-    function readPendingScores():
-        Array<{ token: string; imageURL: string; score: number; playerName: string }> {
-        if (typeof window === "undefined") {
-            return [];
-        }
-        const raw = localStorage.getItem(PENDING_SCORES_KEY);
-        if (!raw) {
-            return [];
-        }
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
-    }
-
     function refreshPendingSyncCount() {
-        pendingSyncCount = readPendingScores().length;
+        pendingSyncCount = scoreQueue.getPendingCount();
+        lastSyncAt = scoreQueue.getLastSyncAt();
     }
 
-    function writePendingScores(
-        scores: Array<{ token: string; imageURL: string; score: number; playerName: string }>,
-    ) {
-        if (typeof window === "undefined") {
-            return;
-        }
-        localStorage.setItem(PENDING_SCORES_KEY, JSON.stringify(scores));
-        pendingSyncCount = scores.length;
-    }
-
-    function queuePendingScore(payload: { token: string; imageURL: string; score: number; playerName: string }) {
-        const existing = readPendingScores();
-        existing.push(payload);
-        // Keep queue bounded.
-        if (existing.length > 40) {
-            existing.splice(0, existing.length - 40);
-        }
-        writePendingScores(existing);
-        console.warn("[GameDebug] queued pending score for retry", payload);
-    }
-
-    async function postScorePayload(payload: { token: string; imageURL: string; score: number; playerName: string }) {
-        await axios.post(`${API_BASE_URL}/scores`, payload, { timeout: SCORE_POST_TIMEOUT_MS });
-    }
-
-    async function postScoreWithRetry(payload: { token: string; imageURL: string; score: number; playerName: string }) {
-        let lastError: unknown = null;
-        for (let attempt = 0; attempt <= SCORE_RETRY_DELAYS_MS.length; attempt += 1) {
-            try {
-                await postScorePayload(payload);
-                return;
-            } catch (error) {
-                lastError = error;
-                if (attempt < SCORE_RETRY_DELAYS_MS.length) {
-                    const waitMs = SCORE_RETRY_DELAYS_MS[attempt];
-                    await new Promise((resolve) => setTimeout(resolve, waitMs));
-                }
-            }
-        }
-        throw lastError;
+    async function postScorePayload(payload: ScorePayload, timeoutMs: number) {
+        await axios.post(`${API_BASE_URL}/scores`, payload, { timeout: timeoutMs });
     }
 
     async function flushPendingScores() {
-        const pending = readPendingScores();
-        if (pending.length === 0) {
+        const pending = scoreQueue.getPendingCount();
+        if (pending === 0) {
+            refreshPendingSyncCount();
             return;
         }
-        console.log("[GameDebug] attempting to flush pending scores", { count: pending.length });
-        const remaining: typeof pending = [];
-        for (const payload of pending) {
-            try {
-                await postScoreWithRetry(payload);
-            } catch {
-                remaining.push(payload);
-            }
-        }
-        writePendingScores(remaining);
-        console.log("[GameDebug] pending score flush complete", { remaining: remaining.length });
+        trackInfo("pending_score_flush_started", { pending });
+        const remaining = await scoreQueue.flush(postScorePayload, SCORE_POST_TIMEOUT_MS, SCORE_RETRY_DELAYS_MS);
+        refreshPendingSyncCount();
+        trackInfo("pending_score_flush_completed", { remaining });
+    }
+
+    async function manualSyncNow() {
+        await flushPendingScores();
     }
 
     function resetSessionState() {
@@ -508,6 +315,7 @@
         scorePosted = false;
         isDead = false;
         showGameOver = false;
+        canRestartAfterDeath = false;
         submittingScore = false;
         latestScore = 0;
         didBeatHighScore = false;
@@ -777,7 +585,7 @@
         });
     }
 
-    function spawnBomb(scene: Phaser.Scene, speedBase: number) {
+    function spawnBomb(speedBase: number) {
         let x = Phaser.Math.Between(50, GAME_WIDTH - 50);
         if (player) {
             for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -817,7 +625,7 @@
         bomb.setAlpha(0.96);
     }
 
-    function enforceBombSafeZone(scene: Phaser.Scene, speedBase: number) {
+    function enforceBombSafeZone(speedBase: number) {
         if (!player) {
             return;
         }
@@ -855,7 +663,7 @@
         const missing = Math.max(0, target - currentCount);
         console.log("[GameDebug] syncBombCount", { target, currentCount, missing, level });
         for (let i = 0; i < missing; i += 1) {
-            spawnBomb(scene, activeLevelConfig().bombSpeed);
+            spawnBomb(activeLevelConfig().bombSpeed);
         }
         bombs.children.each((child) => {
             const bomb = child as Phaser.Physics.Arcade.Image;
@@ -983,7 +791,7 @@
         const config = activeLevelConfig();
         console.log("[GameDebug] applyLevelTheme", { level, title: config.title, showBanner });
         if (options.anchor) {
-            config.platformLayout = buildLayoutFromAnchor(level, options.anchor.x, options.anchor.y);
+            config.platformLayout = buildLayoutFromAnchor(level, options.anchor.x, options.anchor.y, GAME_WIDTH);
         }
         levelThemeName = config.title;
         if (background) {
@@ -1001,7 +809,7 @@
         const finalizeSpawns = () => {
             resetStars();
             syncBombCount(scene);
-            enforceBombSafeZone(scene, config.bombSpeed);
+            enforceBombSafeZone(config.bombSpeed);
         };
 
         if (options.sequentialReveal) {
@@ -1024,7 +832,7 @@
                 });
             }
             syncBombCount(scene);
-            enforceBombSafeZone(scene, config.bombSpeed);
+            enforceBombSafeZone(config.bombSpeed);
         } else {
             buildPlatforms(scene, config.platformLayout);
             resetStars();
@@ -1032,7 +840,7 @@
                 placePlayerAtLevelStart();
             }
             syncBombCount(scene);
-            enforceBombSafeZone(scene, config.bombSpeed);
+            enforceBombSafeZone(config.bombSpeed);
         }
         uiLevel = level;
         comboMultiplier = 1;
@@ -1058,13 +866,15 @@
             playerName: $playerName ?? "anonymous",
         };
         try {
-            await postScoreWithRetry(payload);
+            await scoreQueue.postWithRetry(payload, postScorePayload, SCORE_POST_TIMEOUT_MS, SCORE_RETRY_DELAYS_MS);
+            refreshPendingSyncCount();
             console.log("[GameDebug] score payload uses original NFT", {
                 token: payload.token,
                 imageURL: payload.imageURL,
             });
         } catch (error) {
-            queuePendingScore(payload);
+            scoreQueue.enqueue(payload);
+            refreshPendingSyncCount();
             scoreSaveError = "Score saved locally and will auto-sync when connection returns.";
             console.error("failed to save score", error);
         } finally {
@@ -1080,6 +890,10 @@
         isDead = true;
         scorePosted = true;
         isLevelTransitioning = false;
+        touchLeftActive = false;
+        touchRightActive = false;
+        touchJumpActive = false;
+        canRestartAfterDeath = false;
         this.physics.pause();
         this.physics.world.timeScale = 0.38;
 
@@ -1102,6 +916,9 @@
         latestScore = score;
         didBeatHighScore = score > highScoreValue;
         showGameOver = true;
+        window.setTimeout(() => {
+            canRestartAfterDeath = true;
+        }, 450);
         await saveScore();
     }
 
@@ -1160,7 +977,7 @@
                 const anchor = getCurrentAnchorLedge();
                 const anchorPlatform = getCurrentAnchorPlatform();
                 const nextLevel = level + 1;
-                const desiredAnchorX = anchorXForLevel(nextLevel);
+                const desiredAnchorX = anchorXForLevel(nextLevel, GAME_WIDTH);
                 const transitionDuration = 2700;
                 const platformObjects = (platforms.getChildren() as Phaser.Physics.Arcade.Image[]) ?? [];
                 const platformStartX = platformObjects.map((platform) => platform.x);
@@ -1250,10 +1067,7 @@
         this.load.image("ground", "./platform.png");
         this.load.image("star", "./star.png");
         this.load.image("bomb", "./bomb.png");
-        this.load.image("dude", selectedPlayerImage, {
-            frameWidth: 180,
-            frameHeight: 270,
-        });
+        this.load.image("dude", selectedPlayerImage);
     }
 
     function create(this: Phaser.Scene) {
@@ -1293,6 +1107,7 @@
 
         cursors = this.input.keyboard.createCursorKeys();
         applyLevelTheme(this, true);
+        verifyAllLevelFirstLedgeReachability(this);
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(bombs, platforms);
         console.log("[GameDebug] create complete");
@@ -1374,6 +1189,9 @@
     }
 
     function retryRun() {
+        if (!canRestartAfterDeath || submittingScore) {
+            return;
+        }
         location.reload();
     }
 
@@ -1390,12 +1208,16 @@
     }
 
     async function backToMenu() {
+        if (!canRestartAfterDeath || submittingScore) {
+            return;
+        }
         await push("/");
         location.reload();
     }
 
     onMount(() => {
         console.log("[GameDebug] onMount start");
+        assertGameRuntimeConfig();
         hydratePersistedPlayerState();
         resetSessionState();
         runSanityChecks();
@@ -1409,9 +1231,11 @@
 
         onWindowError = (event: ErrorEvent) => {
             console.error("[GameDebug] window error", event.error ?? event.message);
+            trackError("window_error", { message: event.message });
         };
         onUnhandledRejection = (event: PromiseRejectionEvent) => {
             console.error("[GameDebug] unhandled rejection", event.reason);
+            trackError("unhandled_rejection", { reason: String(event.reason) });
         };
         window.addEventListener("error", onWindowError);
         window.addEventListener("unhandledrejection", onUnhandledRejection);
@@ -1499,9 +1323,15 @@
 
 <div class="game-shell">
     <div id={GAME_CONTAINER_ID} class="game-canvas" />
-    {#if pendingSyncCount > 0}
-        <div class="sync-badge">Pending Sync: {pendingSyncCount}</div>
-    {/if}
+    <div class="sync-panel">
+        {#if pendingSyncCount > 0}
+            <div class="sync-badge">Pending Sync: {pendingSyncCount}</div>
+            <button class="sync-btn" on:click={manualSyncNow}>Sync now</button>
+        {/if}
+        {#if lastSyncAt}
+            <div class="sync-meta">Last sync: {new Date(lastSyncAt).toLocaleTimeString()}</div>
+        {/if}
+    </div>
     <div class="hud">
         <div class="hud-card player-card">
             <span class="label">Pilot</span>
@@ -1538,8 +1368,8 @@
                     <p>Score submitted.</p>
                 {/if}
                 <div class="actions">
-                    <button on:click={retryRun}>Retry</button>
-                    <button class="secondary" on:click={backToMenu}>Menu</button>
+                    <button disabled={!canRestartAfterDeath || submittingScore} on:click={retryRun}>Retry</button>
+                    <button class="secondary" disabled={!canRestartAfterDeath || submittingScore} on:click={backToMenu}>Menu</button>
                 </div>
             </div>
         </div>
@@ -1548,6 +1378,7 @@
     <div class="mobile-controls">
         <button
             class="control-btn"
+            aria-label="Move left"
             class:active={touchLeftActive}
             on:touchstart|preventDefault={() => setTouchControl("left", true)}
             on:touchend|preventDefault={() => setTouchControl("left", false)}
@@ -1557,6 +1388,7 @@
         </button>
         <button
             class="control-btn jump-btn"
+            aria-label="Jump"
             class:active={touchJumpActive}
             on:touchstart|preventDefault={() => setTouchControl("jump", true)}
             on:touchend|preventDefault={() => setTouchControl("jump", false)}
@@ -1566,6 +1398,7 @@
         </button>
         <button
             class="control-btn"
+            aria-label="Move right"
             class:active={touchRightActive}
             on:touchstart|preventDefault={() => setTouchControl("right", true)}
             on:touchend|preventDefault={() => setTouchControl("right", false)}
@@ -1629,11 +1462,17 @@
         pointer-events: none;
     }
 
-    .sync-badge {
+    .sync-panel {
         position: absolute;
         top: 12px;
         right: 16px;
         z-index: 25;
+        display: grid;
+        justify-items: end;
+        gap: 6px;
+    }
+
+    .sync-badge {
         border: 1px solid rgba(255, 180, 180, 0.7);
         background: rgba(83, 15, 15, 0.85);
         color: #ffe3e3;
@@ -1643,6 +1482,24 @@
         font-weight: 700;
         letter-spacing: 0.02em;
         backdrop-filter: blur(3px);
+    }
+
+    .sync-btn {
+        border: 1px solid rgba(197, 226, 255, 0.45);
+        background: rgba(13, 29, 56, 0.86);
+        color: #d9ebff;
+        border-radius: 8px;
+        padding: 5px 9px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .sync-meta {
+        color: rgba(223, 236, 255, 0.8);
+        font-size: 11px;
+        font-weight: 600;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
     }
 
     .hud-card {
@@ -1803,6 +1660,13 @@
     .actions button:hover {
         transform: translateY(-1px);
         filter: brightness(1.03);
+    }
+
+    .actions button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+        filter: none;
     }
 
     .mobile-controls {

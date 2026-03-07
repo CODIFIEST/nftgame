@@ -12,9 +12,9 @@
     </div>
     <div class="flex-1">
         {#if $playerName}
-      <a class="btn btn-ghost normal-case text-xl">{$playerName}</a>
+      <span class="btn btn-ghost normal-case text-xl">{$playerName}</span>
       {:else}
-      <a class="btn btn-ghost normal-case text-xl">Log in below to see your name</a>
+      <span class="btn btn-ghost normal-case text-xl">Log in below to see your name</span>
       {/if}
     </div>
     <div class="flex-none">

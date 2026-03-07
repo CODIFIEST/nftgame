@@ -1,30 +1,17 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
     import Router from 'svelte-spa-router/Router.svelte'
+    import { wrap } from "svelte-spa-router/wrap";
     import { location } from "svelte-spa-router";
     import DisplayNfTs from "./pages/DisplayNFTs.svelte";
 
-    import Hero from "../components/Hero.svelte";
-    import HighScoreList from "../components/HighScoreList.svelte";
-
     import Home from "./pages/Home.svelte";
     import LoginPage from "./pages/LoginPage.svelte";
-     import { account } from "./stores/account";
-    import player1 from "./stores/player1";
-    import { playerImage } from "./stores/playerImage";
-    import playerName from "./stores/playername";
-    import GameOn from './pages/GameOn.svelte';
-    import Navbar from '../components/Navbar.svelte';
-    let viewForm:boolean = true
+    import { assertGameRuntimeConfig } from "./config/runtime";
     let backgroundAudio: HTMLAudioElement | null = null;
     let resumeAudioOnGesture: (() => void) | null = null;
     let isMuted = false;
     let isPhantomBrowser = false;
-
-    function toggleDisplay() {
-        viewForm = !viewForm;
-
-    }
 
     const routes = {
     // Exact path
@@ -37,7 +24,9 @@
     // Display all possible characters
     "/displaychars": DisplayNfTs,
     //edit only your own user
-    "/game": GameOn,
+    "/game": wrap({
+      asyncComponent: () => import("./pages/GameOn.svelte"),
+    }),
 
     // Catch-all
     // This is optional, but if present it must be the last
@@ -65,13 +54,14 @@
   }
 
   onMount(() => {
+    assertGameRuntimeConfig();
     isPhantomBrowser = /phantom/i.test(navigator.userAgent);
 
     const trackUrl = encodeURI("/audio/colder still OST thingie 2-23-2026.mp3");
     backgroundAudio = new Audio(trackUrl);
     backgroundAudio.loop = true;
     backgroundAudio.preload = "auto";
-    backgroundAudio.playsInline = true;
+    (backgroundAudio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
     backgroundAudio.volume = 0.45;
     backgroundAudio.muted = isMuted;
 
