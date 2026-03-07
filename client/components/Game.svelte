@@ -3,8 +3,33 @@
     import * as Phaser from "phaser";
     import { onDestroy, onMount } from "svelte";
     import { assertGameRuntimeConfig, getApiBaseUrl } from "../src/config/runtime";
+    import {
+        BACKGROUND_SCALE,
+        BACKGROUND_SECTION_GRID,
+        BASE_CAMERA_ZOOM,
+        BOMB_VISIBLE_TOP_Y,
+        CAMERA_NEAR_MISS_COOLDOWN_MS,
+        CAMERA_NEAR_MISS_DISTANCE,
+        GAME_CONTAINER_ID,
+        GAME_HEIGHT,
+        GAME_WIDTH,
+        JUMP_HOLD_ACCEL,
+        JUMP_HOLD_MAX_MS,
+        JUMP_INITIAL_VELOCITY,
+        JUMP_RELEASE_CUTOFF,
+        PLAYER_BOMB_SAFE_DISTANCE,
+        PLAYER_IMAGE_KEY,
+        PLAYER_MOVE_SPEED,
+        PLAYER_NAME_KEY,
+        PLAYER_NFT_KEY,
+        SCORE_POST_TIMEOUT_MS,
+        SCORE_RETRY_DELAYS_MS,
+        TOTAL_LEVELS,
+        WORLD_GRAVITY_Y,
+    } from "../src/game/constants";
     import { ScoreSyncQueue, type ScorePayload } from "../src/game/scoreSync";
     import { trackError, trackInfo } from "../src/game/telemetry";
+    import { disposeAudio, playTone } from "../src/game/audio";
     import {
         anchorXForLevel,
         buildLayoutFromAnchor,
@@ -13,6 +38,7 @@
         type LevelConfig,
         type PlatformConfig,
     } from "../src/game/levels";
+    import { dataUrlToObjectUrl, getPersistedNft, hydratePersistedPlayerState } from "../src/game/playerSession";
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
     import { playerImage } from "../src/stores/playerImage";
@@ -34,30 +60,8 @@
     };
 
 
-    const GAME_WIDTH = 1400;
-    const GAME_HEIGHT = 1000;
-    const TOTAL_LEVELS = 100;
     const LEVELS: LevelConfig[] = buildLevels(TOTAL_LEVELS, GAME_WIDTH);
-    const BASE_CAMERA_ZOOM = 1.06;
-    const BACKGROUND_SCALE = 5;
-    const BACKGROUND_SECTION_GRID = 5;
-    const GAME_CONTAINER_ID = "game-root";
-    const PLAYER_NAME_KEY = "nftgame.playerName";
-    const PLAYER_NFT_KEY = "nftgame.playerNft";
-    const PLAYER_IMAGE_KEY = "nftgame.playerImage";
-    const PLAYER_MOVE_SPEED = 190;
-    const JUMP_INITIAL_VELOCITY = -320;
-    const JUMP_HOLD_ACCEL = -760;
-    const JUMP_HOLD_MAX_MS = 210;
-    const JUMP_RELEASE_CUTOFF = -120;
-    const WORLD_GRAVITY_Y = 320;
     const API_BASE_URL = getApiBaseUrl();
-    const PLAYER_BOMB_SAFE_DISTANCE = 260;
-    const SCORE_POST_TIMEOUT_MS = 12000;
-    const SCORE_RETRY_DELAYS_MS = [700, 1800, 3500];
-    const CAMERA_NEAR_MISS_DISTANCE = 135;
-    const CAMERA_NEAR_MISS_COOLDOWN_MS = 550;
-    const BOMB_VISIBLE_TOP_Y = 80;
 
     let game: Phaser.Game | null = null;
     let sceneRef: Phaser.Scene | null = null;
@@ -69,7 +73,6 @@
     let bombs: Phaser.Physics.Arcade.Group;
     let player: Phaser.Physics.Arcade.Sprite;
     let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-    let audioContext: AudioContext | null = null;
 
     let score = 0;
     let level = 1;
@@ -109,52 +112,56 @@
     let touchLeftActive = false;
     let touchRightActive = false;
     let touchJumpActive = false;
+    let showStartOverlay = true;
+    let hasRunStarted = false;
+    let isPaused = false;
+    let showOptions = false;
+    let reducedMotion = false;
+    let leftHandedMobileControls = false;
+    let onWindowKeydown: ((event: KeyboardEvent) => void) | undefined;
+
+    const REDUCED_MOTION_KEY = "nftgame.reducedMotion";
+    const LEFT_HANDED_KEY = "nftgame.leftHandedControls";
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
-
-    function getAudioContext(): AudioContext | null {
-        if (audioContext) {
-            return audioContext;
-        }
-        if (typeof window === "undefined") {
-            return null;
-        }
-
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioCtx) {
-            return null;
-        }
-
-        audioContext = new AudioCtx();
-        return audioContext;
-    }
-
-    function playTone(frequency: number, durationMs: number, gain = 0.03, type: OscillatorType = "sine") {
-        const ctx = getAudioContext();
-        if (!ctx) {
-            return;
-        }
-
-        if (ctx.state === "suspended") {
-            void ctx.resume();
-        }
-
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-        oscillator.type = type;
-        oscillator.frequency.value = frequency;
-        gainNode.gain.value = gain;
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        const now = ctx.currentTime;
-        gainNode.gain.setValueAtTime(gain, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
-        oscillator.start(now);
-        oscillator.stop(now + durationMs / 1000);
+    $: if (typeof window !== "undefined") {
+        localStorage.setItem(REDUCED_MOTION_KEY, reducedMotion ? "1" : "0");
+        localStorage.setItem(LEFT_HANDED_KEY, leftHandedMobileControls ? "1" : "0");
     }
 
     function activeLevelConfig(): LevelConfig {
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
+    }
+
+    function loadGameplayPreferences() {
+        if (typeof window === "undefined") {
+            return;
+        }
+        reducedMotion = localStorage.getItem(REDUCED_MOTION_KEY) === "1";
+        leftHandedMobileControls = localStorage.getItem(LEFT_HANDED_KEY) === "1";
+    }
+
+    function beginRun() {
+        if (!sceneRef || hasRunStarted || isDead) {
+            return;
+        }
+        hasRunStarted = true;
+        showStartOverlay = false;
+        isPaused = false;
+        sceneRef.physics.resume();
+        playTone(640, 100, 0.02, "triangle");
+    }
+
+    function togglePause() {
+        if (!sceneRef || !hasRunStarted || isDead || showGameOver || isLevelTransitioning) {
+            return;
+        }
+        isPaused = !isPaused;
+        if (isPaused) {
+            sceneRef.physics.pause();
+        } else {
+            sceneRef.physics.resume();
+        }
     }
 
     function estimateMaxJumpRisePx(): number {
@@ -208,22 +215,6 @@
         });
     }
 
-    function dataUrlToObjectUrl(dataUrl: string): string | null {
-        const matches = dataUrl.match(/^data:(.*?);base64,(.*)$/);
-        if (!matches) {
-            return null;
-        }
-        const mimeType = matches[1] || "image/png";
-        const base64 = matches[2];
-        const binaryString = atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i += 1) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: mimeType });
-        return URL.createObjectURL(blob);
-    }
-
     function runSanityChecks() {
         console.group("[GameDebug] Sanity checks");
         console.assert(Array.isArray(LEVELS) && LEVELS.length > 0, "LEVELS config missing");
@@ -237,49 +228,6 @@
             highScoreValue,
         });
         console.groupEnd();
-    }
-
-    function hydratePersistedPlayerState() {
-        if (typeof window === "undefined") {
-            return;
-        }
-
-        const persistedName = sessionStorage.getItem(PLAYER_NAME_KEY);
-        if (persistedName && !$playerName) {
-            playerName.set(persistedName);
-        }
-
-        const persistedImage = sessionStorage.getItem(PLAYER_IMAGE_KEY);
-        if (persistedImage && !$playerImage) {
-            playerImage.set(persistedImage);
-        }
-
-        const persistedNft = sessionStorage.getItem(PLAYER_NFT_KEY);
-        if (persistedNft && !$player1nft) {
-            try {
-                player1nft.set(JSON.parse(persistedNft));
-            } catch (error) {
-                console.error("[GameDebug] failed to parse persisted NFT", error);
-            }
-        }
-    }
-
-    function getPersistedNft():
-        | { tokenAddress?: string; imageURL?: string }
-        | null {
-        if (typeof window === "undefined") {
-            return null;
-        }
-        const persistedNft = sessionStorage.getItem(PLAYER_NFT_KEY);
-        if (!persistedNft) {
-            return null;
-        }
-        try {
-            return JSON.parse(persistedNft) as { tokenAddress?: string; imageURL?: string };
-        } catch (error) {
-            console.error("[GameDebug] failed to parse persisted NFT for score save", error);
-            return null;
-        }
     }
 
     function refreshPendingSyncCount() {
@@ -754,6 +702,9 @@
     }
 
     function triggerHudPulse(kind: "score" | "combo" | "level") {
+        if (reducedMotion) {
+            return;
+        }
         const durationMs = 220;
         if (kind === "score") {
             scorePulse = false;
@@ -848,7 +799,9 @@
         triggerHudPulse("level");
         playTone(480 + level * 30, 120, 0.025, "triangle");
         playTone(610 + level * 30, 150, 0.02, "triangle");
-        scene.cameras.main.flash(220, 255, 255, 255, false);
+        if (!reducedMotion) {
+            scene.cameras.main.flash(220, 255, 255, 255, false);
+        }
 
         if (showBanner) {
             levelBanner(scene, `Level ${level}: ${config.title}`);
@@ -856,7 +809,7 @@
     }
 
     async function saveScore() {
-        const selectedNft = $player1nft ?? getPersistedNft();
+        const selectedNft = $player1nft ?? getPersistedNft(PLAYER_NFT_KEY);
         submittingScore = true;
         scoreSaveError = "";
         const payload = {
@@ -900,8 +853,10 @@
         const body = colliderPlayer as Phaser.Physics.Arcade.Sprite;
         body.setTint(0xff0000);
         playTone(140, 300, 0.045, "sawtooth");
-        this.cameras.main.shake(300, 0.013);
-        this.cameras.main.flash(180, 255, 80, 80, false);
+        if (!reducedMotion) {
+            this.cameras.main.shake(300, 0.013);
+            this.cameras.main.flash(180, 255, 80, 80, false);
+        }
         this.tweens.add({
             targets: this.cameras.main,
             zoom: BASE_CAMERA_ZOOM + 0.08,
@@ -1110,11 +1065,14 @@
         verifyAllLevelFirstLedgeReachability(this);
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(bombs, platforms);
+        if (!hasRunStarted) {
+            this.physics.pause();
+        }
         console.log("[GameDebug] create complete");
     }
 
     function update() {
-        if (!player || !cursors || isDead) {
+        if (!player || !cursors || isDead || !hasRunStarted || isPaused) {
             return;
         }
 
@@ -1132,6 +1090,7 @@
         });
         keepBombsVisible();
         if (
+            !reducedMotion &&
             nearestBombDistance < CAMERA_NEAR_MISS_DISTANCE &&
             now - lastNearMissShakeAt > CAMERA_NEAR_MISS_COOLDOWN_MS
         ) {
@@ -1218,7 +1177,18 @@
     onMount(() => {
         console.log("[GameDebug] onMount start");
         assertGameRuntimeConfig();
-        hydratePersistedPlayerState();
+        hydratePersistedPlayerState({
+            playerNameKey: PLAYER_NAME_KEY,
+            playerImageKey: PLAYER_IMAGE_KEY,
+            playerNftKey: PLAYER_NFT_KEY,
+            playerName: $playerName,
+            playerImage: $playerImage,
+            playerNft: $player1nft,
+            setPlayerName: (value) => playerName.set(value),
+            setPlayerImage: (value) => playerImage.set(value),
+            setPlayerNft: (value) => player1nft.set(value as any),
+        });
+        loadGameplayPreferences();
         resetSessionState();
         runSanityChecks();
         refreshPendingSyncCount();
@@ -1237,8 +1207,17 @@
             console.error("[GameDebug] unhandled rejection", event.reason);
             trackError("unhandled_rejection", { reason: String(event.reason) });
         };
+        onWindowKeydown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                togglePause();
+            }
+            if (event.key === "Enter" && showStartOverlay && !hasRunStarted) {
+                beginRun();
+            }
+        };
         window.addEventListener("error", onWindowError);
         window.addEventListener("unhandledrejection", onUnhandledRejection);
+        window.addEventListener("keydown", onWindowKeydown);
 
         game = new Phaser.Game({
             type: Phaser.AUTO,
@@ -1309,6 +1288,9 @@
         if (onWindowOnline) {
             window.removeEventListener("online", onWindowOnline);
         }
+        if (onWindowKeydown) {
+            window.removeEventListener("keydown", onWindowKeydown);
+        }
         if (game) {
             game.destroy(true);
             game = null;
@@ -1317,6 +1299,7 @@
             URL.revokeObjectURL(runtimeSpriteObjectUrl);
             runtimeSpriteObjectUrl = null;
         }
+        void disposeAudio();
         ambienceParticles = null;
     });
 </script>
@@ -1332,6 +1315,26 @@
             <div class="sync-meta">Last sync: {new Date(lastSyncAt).toLocaleTimeString()}</div>
         {/if}
     </div>
+    <div class="run-controls">
+        {#if hasRunStarted && !showGameOver}
+            <button class="control-action" on:click={togglePause}>{isPaused ? "Resume" : "Pause"}</button>
+        {/if}
+        <button class="control-action secondary" on:click={() => (showOptions = !showOptions)}>
+            {showOptions ? "Hide Options" : "Options"}
+        </button>
+    </div>
+    {#if showOptions}
+        <div class="options-panel">
+            <label>
+                <input type="checkbox" bind:checked={reducedMotion} />
+                Reduced motion
+            </label>
+            <label>
+                <input type="checkbox" bind:checked={leftHandedMobileControls} />
+                Left-handed controls
+            </label>
+        </div>
+    {/if}
     <div class="hud">
         <div class="hud-card player-card">
             <span class="label">Pilot</span>
@@ -1375,7 +1378,28 @@
         </div>
     {/if}
 
-    <div class="mobile-controls">
+    {#if showStartOverlay}
+        <div class="start-overlay">
+            <div class="start-card">
+                <h2>Ready To Run</h2>
+                <p>Collect stars, build combo, avoid bombs.</p>
+                <p class="help">Desktop: arrow keys. Mobile: on-screen controls.</p>
+                <button on:click={beginRun}>Start Run</button>
+            </div>
+        </div>
+    {/if}
+
+    {#if isPaused && !showGameOver}
+        <div class="pause-overlay">
+            <div class="pause-card">
+                <h3>Paused</h3>
+                <p>Press Esc or tap resume to continue.</p>
+                <button on:click={togglePause}>Resume</button>
+            </div>
+        </div>
+    {/if}
+
+    <div class="mobile-controls" class:left-handed={leftHandedMobileControls}>
         <button
             class="control-btn"
             aria-label="Move left"
@@ -1502,6 +1526,53 @@
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
     }
 
+    .run-controls {
+        position: absolute;
+        top: 90px;
+        right: 16px;
+        z-index: 25;
+        display: grid;
+        gap: 8px;
+        justify-items: end;
+    }
+
+    .control-action {
+        border: 1px solid rgba(197, 226, 255, 0.45);
+        background: rgba(13, 29, 56, 0.9);
+        color: #d9ebff;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .control-action.secondary {
+        background: rgba(19, 40, 70, 0.86);
+    }
+
+    .options-panel {
+        position: absolute;
+        top: 154px;
+        right: 16px;
+        z-index: 25;
+        display: grid;
+        gap: 8px;
+        color: #e5efff;
+        font-size: 12px;
+        font-weight: 600;
+        background: rgba(8, 17, 35, 0.86);
+        border: 1px solid rgba(194, 214, 255, 0.34);
+        border-radius: 10px;
+        padding: 10px 12px;
+    }
+
+    .options-panel label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
     .hud-card {
         background: linear-gradient(155deg, rgba(9, 21, 46, 0.24), rgba(4, 12, 27, 0.18));
         border: 1px solid rgba(219, 234, 255, 0.1);
@@ -1608,6 +1679,58 @@
         backdrop-filter: blur(2px);
     }
 
+    .start-overlay,
+    .pause-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 45;
+        display: grid;
+        place-items: center;
+        background: rgba(8, 12, 20, 0.72);
+        backdrop-filter: blur(2px);
+    }
+
+    .start-card,
+    .pause-card {
+        width: min(420px, 90vw);
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: linear-gradient(165deg, rgba(20, 32, 55, 0.98), rgba(8, 14, 28, 0.95));
+        padding: 20px;
+        color: #eaf2ff;
+        text-align: center;
+        display: grid;
+        gap: 8px;
+    }
+
+    .start-card h2,
+    .pause-card h3 {
+        margin: 0;
+        color: #ffedc6;
+    }
+
+    .start-card p,
+    .pause-card p {
+        margin: 0;
+    }
+
+    .start-card .help {
+        color: #a9c2e3;
+        font-size: 13px;
+    }
+
+    .start-card button,
+    .pause-card button {
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(140deg, #ffd37f, #ffbf63);
+        color: #1f1a0f;
+        font-weight: 700;
+        padding: 10px 16px;
+        cursor: pointer;
+        margin-top: 6px;
+    }
+
     .game-over-card {
         width: min(420px, 90vw);
         background: linear-gradient(165deg, rgba(23, 35, 61, 0.98), rgba(10, 17, 33, 0.96));
@@ -1679,6 +1802,10 @@
         gap: 14px;
         z-index: 35;
         pointer-events: none;
+    }
+
+    .mobile-controls.left-handed {
+        flex-direction: row-reverse;
     }
 
     .control-btn {

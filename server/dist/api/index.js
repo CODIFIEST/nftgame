@@ -42,6 +42,8 @@ const express_1 = __importDefault(require("express"));
 const app_1 = require("firebase/app");
 const firestore_1 = require("firebase/firestore");
 const season_1 = require("./season");
+const rateLimit_1 = require("./rateLimit");
+const scoreValidation_1 = require("./scoreValidation");
 dotenv.config();
 const firebaseConfig = {
     apiKey: process.env.apiKey,
@@ -54,12 +56,14 @@ const firebaseConfig = {
 const dbApp = (0, app_1.initializeApp)(firebaseConfig);
 const database = (0, firestore_1.getFirestore)(dbApp);
 const SCORE_COLLECTION = "23mayhighscores";
+const DEFAULT_QUERY_LIMIT = 50;
 const ALLOWED_ORIGINS = [
     "https://nftgame-dusky.vercel.app",
     "https://nftgame-server.vercel.app",
     "http://localhost:5173",
     "http://localhost:4173",
 ];
+const postRateLimiter = new rateLimit_1.SlidingWindowRateLimiter();
 const corsOptions = {
     origin: (origin, callback) => {
         if (!origin || ALLOWED_ORIGINS.includes(origin)) {
@@ -72,49 +76,63 @@ const corsOptions = {
     allowedHeaders: ["Content-Type", "Authorization"],
     optionsSuccessStatus: 204,
 };
-function normalizeScoreRecord(raw, id) {
-    var _a, _b, _c;
-    const data = (raw !== null && raw !== void 0 ? raw : {});
-    if (typeof data.score !== "number" || Number.isNaN(data.score)) {
-        return null;
-    }
-    const normalizedSeason = typeof data.season === "string" ? data.season.trim() : "";
-    return {
-        token: String((_a = data.token) !== null && _a !== void 0 ? _a : ""),
-        imageURL: String((_b = data.imageURL) !== null && _b !== void 0 ? _b : ""),
-        playerName: String((_c = data.playerName) !== null && _c !== void 0 ? _c : "anonymous"),
-        score: Math.max(0, Math.floor(data.score)),
-        season: normalizedSeason,
-        id,
-    };
-}
-function parseIncomingScore(body) {
-    var _a, _b, _c, _d;
-    const payload = (body !== null && body !== void 0 ? body : {});
-    const scoreValue = Number((_a = payload.score) !== null && _a !== void 0 ? _a : 0);
-    if (!Number.isFinite(scoreValue) || scoreValue < 0) {
-        throw new Error("Score must be a non-negative number.");
-    }
-    const playerName = String((_b = payload.playerName) !== null && _b !== void 0 ? _b : "anonymous").trim() || "anonymous";
-    return {
-        token: String((_c = payload.token) !== null && _c !== void 0 ? _c : ""),
-        imageURL: String((_d = payload.imageURL) !== null && _d !== void 0 ? _d : ""),
-        playerName: playerName.slice(0, 32),
-        score: Math.floor(scoreValue),
-        season: (0, season_1.getCurrentSeason)(),
-    };
-}
 function readAllScores() {
     return __awaiter(this, void 0, void 0, function* () {
         const cleanData = [];
         const allScores = yield (0, firestore_1.getDocs)((0, firestore_1.collection)(database, SCORE_COLLECTION));
         allScores.forEach((item) => {
-            const normalized = normalizeScoreRecord(item.data(), item.id);
+            const normalized = (0, scoreValidation_1.normalizeScoreRecord)(item.data(), item.id);
             if (normalized) {
                 cleanData.push(normalized);
             }
         });
         return cleanData;
+    });
+}
+function readSeasonScores(season, maxRows) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const ref = (0, firestore_1.collection)(database, SCORE_COLLECTION);
+            const scoreQuery = (0, firestore_1.query)(ref, (0, firestore_1.where)("season", "==", season), (0, firestore_1.orderBy)("score", "desc"), (0, firestore_1.limit)(maxRows));
+            const docs = yield (0, firestore_1.getDocs)(scoreQuery);
+            const cleanData = [];
+            docs.forEach((item) => {
+                const normalized = (0, scoreValidation_1.normalizeScoreRecord)(item.data(), item.id);
+                if (normalized) {
+                    cleanData.push(normalized);
+                }
+            });
+            return cleanData;
+        }
+        catch (_a) {
+            // Fallback keeps endpoint alive if index is missing during rollout.
+            const allScores = yield readAllScores();
+            return allScores
+                .filter((score) => score.season === season)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, maxRows);
+        }
+    });
+}
+function readAllTimeTopScores(maxRows) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const ref = (0, firestore_1.collection)(database, SCORE_COLLECTION);
+            const scoreQuery = (0, firestore_1.query)(ref, (0, firestore_1.orderBy)("score", "desc"), (0, firestore_1.limit)(maxRows));
+            const docs = yield (0, firestore_1.getDocs)(scoreQuery);
+            const cleanData = [];
+            docs.forEach((item) => {
+                const normalized = (0, scoreValidation_1.normalizeScoreRecord)(item.data(), item.id);
+                if (normalized) {
+                    cleanData.push(normalized);
+                }
+            });
+            return cleanData;
+        }
+        catch (_a) {
+            const allScores = yield readAllScores();
+            return allScores.sort((a, b) => b.score - a.score).slice(0, maxRows);
+        }
     });
 }
 function createApp() {
@@ -131,20 +149,21 @@ function createApp() {
     });
     app.get("/scores", (req, res) => __awaiter(this, void 0, void 0, function* () {
         try {
+            const maxRows = (0, scoreValidation_1.parseLimit)(req.query.limit, DEFAULT_QUERY_LIMIT);
             const season = typeof req.query.season === "string" && req.query.season.trim()
                 ? req.query.season.trim()
                 : (0, season_1.getCurrentSeason)();
-            const allScores = yield readAllScores();
-            const seasonScores = allScores.filter((score) => score.season === season);
+            const seasonScores = yield readSeasonScores(season, maxRows);
             res.status(200).send(seasonScores);
         }
         catch (error) {
             res.status(500).send({ error: "Failed to load scores." });
         }
     }));
-    app.get("/scores/all-time", (_req, res) => __awaiter(this, void 0, void 0, function* () {
+    app.get("/scores/all-time", (req, res) => __awaiter(this, void 0, void 0, function* () {
         try {
-            const scores = yield readAllScores();
+            const maxRows = (0, scoreValidation_1.parseLimit)(req.query.limit, DEFAULT_QUERY_LIMIT);
+            const scores = yield readAllTimeTopScores(maxRows);
             res.status(200).send(scores);
         }
         catch (error) {
@@ -153,7 +172,12 @@ function createApp() {
     }));
     app.post("/scores", (req, res) => __awaiter(this, void 0, void 0, function* () {
         try {
-            const playerScore = parseIncomingScore(req.body);
+            const ipKey = req.ip || req.socket.remoteAddress || "unknown";
+            if (!postRateLimiter.consume(ipKey)) {
+                res.status(429).send({ error: "Too many score submissions. Try again in a minute." });
+                return;
+            }
+            const playerScore = (0, scoreValidation_1.parseIncomingScore)(req.body);
             const created = yield (0, firestore_1.addDoc)((0, firestore_1.collection)(database, SCORE_COLLECTION), playerScore);
             res.status(201).send(Object.assign(Object.assign({}, playerScore), { id: created.id }));
         }

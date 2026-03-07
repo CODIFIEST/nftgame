@@ -2,9 +2,11 @@ import cors from "cors";
 import * as dotenv from "dotenv";
 import express from "express";
 import { initializeApp } from "firebase/app";
-import { addDoc, collection, getDocs, getFirestore } from "firebase/firestore";
+import { addDoc, collection, getDocs, getFirestore, limit, orderBy, query, where } from "firebase/firestore";
 import { getCurrentSeason } from "./season";
 import { HighScore } from "../domain/highscore";
+import { SlidingWindowRateLimiter } from "./rateLimit";
+import { normalizeScoreRecord, parseIncomingScore, parseLimit } from "./scoreValidation";
 
 dotenv.config();
 
@@ -20,12 +22,14 @@ const firebaseConfig = {
 const dbApp = initializeApp(firebaseConfig);
 const database = getFirestore(dbApp);
 const SCORE_COLLECTION = "23mayhighscores";
+const DEFAULT_QUERY_LIMIT = 50;
 const ALLOWED_ORIGINS = [
     "https://nftgame-dusky.vercel.app",
     "https://nftgame-server.vercel.app",
     "http://localhost:5173",
     "http://localhost:4173",
 ];
+const postRateLimiter = new SlidingWindowRateLimiter();
 
 const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
@@ -40,38 +44,6 @@ const corsOptions: cors.CorsOptions = {
     optionsSuccessStatus: 204,
 };
 
-function normalizeScoreRecord(raw: unknown, id: string): HighScore | null {
-    const data = (raw ?? {}) as Partial<HighScore>;
-    if (typeof data.score !== "number" || Number.isNaN(data.score)) {
-        return null;
-    }
-    const normalizedSeason = typeof data.season === "string" ? data.season.trim() : "";
-    return {
-        token: String(data.token ?? ""),
-        imageURL: String(data.imageURL ?? ""),
-        playerName: String(data.playerName ?? "anonymous"),
-        score: Math.max(0, Math.floor(data.score)),
-        season: normalizedSeason,
-        id,
-    };
-}
-
-function parseIncomingScore(body: unknown): Omit<HighScore, "id"> {
-    const payload = (body ?? {}) as Partial<HighScore>;
-    const scoreValue = Number(payload.score ?? 0);
-    if (!Number.isFinite(scoreValue) || scoreValue < 0) {
-        throw new Error("Score must be a non-negative number.");
-    }
-    const playerName = String(payload.playerName ?? "anonymous").trim() || "anonymous";
-    return {
-        token: String(payload.token ?? ""),
-        imageURL: String(payload.imageURL ?? ""),
-        playerName: playerName.slice(0, 32),
-        score: Math.floor(scoreValue),
-        season: getCurrentSeason(),
-    };
-}
-
 async function readAllScores(): Promise<HighScore[]> {
     const cleanData: HighScore[] = [];
     const allScores = await getDocs(collection(database, SCORE_COLLECTION));
@@ -82,6 +54,48 @@ async function readAllScores(): Promise<HighScore[]> {
         }
     });
     return cleanData;
+}
+
+async function readSeasonScores(season: string, maxRows: number): Promise<HighScore[]> {
+    try {
+        const ref = collection(database, SCORE_COLLECTION);
+        const scoreQuery = query(ref, where("season", "==", season), orderBy("score", "desc"), limit(maxRows));
+        const docs = await getDocs(scoreQuery);
+        const cleanData: HighScore[] = [];
+        docs.forEach((item) => {
+            const normalized = normalizeScoreRecord(item.data(), item.id);
+            if (normalized) {
+                cleanData.push(normalized);
+            }
+        });
+        return cleanData;
+    } catch {
+        // Fallback keeps endpoint alive if index is missing during rollout.
+        const allScores = await readAllScores();
+        return allScores
+            .filter((score) => score.season === season)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, maxRows);
+    }
+}
+
+async function readAllTimeTopScores(maxRows: number): Promise<HighScore[]> {
+    try {
+        const ref = collection(database, SCORE_COLLECTION);
+        const scoreQuery = query(ref, orderBy("score", "desc"), limit(maxRows));
+        const docs = await getDocs(scoreQuery);
+        const cleanData: HighScore[] = [];
+        docs.forEach((item) => {
+            const normalized = normalizeScoreRecord(item.data(), item.id);
+            if (normalized) {
+                cleanData.push(normalized);
+            }
+        });
+        return cleanData;
+    } catch {
+        const allScores = await readAllScores();
+        return allScores.sort((a, b) => b.score - a.score).slice(0, maxRows);
+    }
 }
 
 export function createApp() {
@@ -100,20 +114,21 @@ export function createApp() {
 
     app.get("/scores", async (req, res) => {
         try {
+            const maxRows = parseLimit(req.query.limit, DEFAULT_QUERY_LIMIT);
             const season = typeof req.query.season === "string" && req.query.season.trim()
                 ? req.query.season.trim()
                 : getCurrentSeason();
-            const allScores = await readAllScores();
-            const seasonScores = allScores.filter((score) => score.season === season);
+            const seasonScores = await readSeasonScores(season, maxRows);
             res.status(200).send(seasonScores);
         } catch (error) {
             res.status(500).send({ error: "Failed to load scores." });
         }
     });
 
-    app.get("/scores/all-time", async (_req, res) => {
+    app.get("/scores/all-time", async (req, res) => {
         try {
-            const scores = await readAllScores();
+            const maxRows = parseLimit(req.query.limit, DEFAULT_QUERY_LIMIT);
+            const scores = await readAllTimeTopScores(maxRows);
             res.status(200).send(scores);
         } catch (error) {
             res.status(500).send({ error: "Failed to load all-time scores." });
@@ -122,6 +137,11 @@ export function createApp() {
 
     app.post("/scores", async (req, res) => {
         try {
+            const ipKey = req.ip || req.socket.remoteAddress || "unknown";
+            if (!postRateLimiter.consume(ipKey)) {
+                res.status(429).send({ error: "Too many score submissions. Try again in a minute." });
+                return;
+            }
             const playerScore = parseIncomingScore(req.body);
             const created = await addDoc(collection(database, SCORE_COLLECTION), playerScore);
             res.status(201).send({
