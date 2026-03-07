@@ -176,10 +176,10 @@
       position: fixed;
       top: 0;
       left: 0;
-      width: 100dvh;
-      height: 100vw;
+      width: 100vw;
+      height: 100dvh;
       transform-origin: top left;
-      transform: rotate(90deg) translateY(-100%);
+      transform: rotate(90deg) translateY(-100vw);
       overflow: hidden;
       padding: 0;
     }
