@@ -23,59 +23,40 @@
         bombSpeed: number;
     };
 
-    const BASE_LEVEL_THEMES: Pick<LevelConfig, "title" | "tint" | "platformLayout">[] = [
+    type BombStyle = {
+        tint: number;
+        scale: number;
+    };
+
+    type LevelThemeOptions = {
+        preservePlayer?: boolean;
+        anchor?: { x: number; y: number };
+        skipBackgroundPan?: boolean;
+        platformTransitionMs?: number;
+        playerTransitionMs?: number;
+        sequentialReveal?: boolean;
+    };
+
+    const BASE_LEVEL_THEMES: Pick<LevelConfig, "title" | "tint">[] = [
         {
             title: "Rooftop Run",
             tint: 0x9bd5ff,
-            platformLayout: [
-                { x: 170, y: 820, scaleX: 1.25 },
-                { x: 560, y: 680, scaleX: 1.2 },
-                { x: 980, y: 560, scaleX: 1.15 },
-            ],
         },
         {
             title: "Factory Lift",
             tint: 0xffd38f,
-            platformLayout: [
-                { x: 190, y: 840, scaleX: 1.45 },
-                { x: 470, y: 715, scaleX: 1.3 },
-                { x: 760, y: 590, scaleX: 1.25 },
-                { x: 1060, y: 470, scaleX: 1.2 },
-            ],
         },
         {
             title: "Storm Walk",
             tint: 0xbac3ff,
-            platformLayout: [
-                { x: 180, y: 810, scaleX: 1.3 },
-                { x: 460, y: 670, scaleX: 1.2 },
-                { x: 760, y: 560, scaleX: 1.15 },
-                { x: 1040, y: 670, scaleX: 1.15 },
-                { x: 1270, y: 540, scaleX: 1.1 },
-            ],
         },
         {
             title: "Neon Tunnel",
             tint: 0xff9add,
-            platformLayout: [
-                { x: 190, y: 825, scaleX: 1.25 },
-                { x: 460, y: 690, scaleX: 1.2 },
-                { x: 740, y: 565, scaleX: 1.15 },
-                { x: 1020, y: 690, scaleX: 1.15 },
-                { x: 1240, y: 545, scaleX: 1.1 },
-            ],
         },
         {
             title: "Core Breach",
             tint: 0xff8d8d,
-            platformLayout: [
-                { x: 170, y: 805, scaleX: 1.3 },
-                { x: 390, y: 660, scaleX: 1.15 },
-                { x: 620, y: 805, scaleX: 1.1 },
-                { x: 860, y: 640, scaleX: 1.1 },
-                { x: 1090, y: 790, scaleX: 1.1 },
-                { x: 1270, y: 625, scaleX: 1.05 },
-            ],
         },
     ];
 
@@ -83,49 +64,118 @@
         return Math.max(min, Math.min(max, value));
     }
 
-    function buildLayoutForLevel(index: number, baseLayout: PlatformConfig[]): PlatformConfig[] {
-        const yLift = Math.min(80, Math.floor(index / 2) * 2);
-        const layout = baseLayout.map((piece, itemIndex) => {
-            const xJitter = ((index * 37 + itemIndex * 29) % 51) - 25;
-            const yJitter = ((index * 13 + itemIndex * 7) % 17) - 8;
-            return {
-                x: clamp(piece.x + xJitter, 110, 1290),
-                y: clamp(piece.y - yLift + yJitter, 430, 860),
-                scaleX: piece.scaleX,
-            };
-        });
+    function rowIndexForLevel(levelNumber: number): number {
+        return Math.floor((levelNumber - 1) / 5);
+    }
 
-        const lowestLedge = Math.max(...layout.map((piece) => piece.y));
-        const requiredLowestLedge = 790;
-        if (lowestLedge < requiredLowestLedge) {
-            const delta = requiredLowestLedge - lowestLedge;
-            layout.forEach((piece) => {
-                piece.y = clamp(piece.y + delta, 430, 860);
+    function movesRightForLevel(levelNumber: number): boolean {
+        return rowIndexForLevel(levelNumber) % 2 === 0;
+    }
+
+    function anchorXForLevel(levelNumber: number): number {
+        return movesRightForLevel(levelNumber) ? 160 : GAME_WIDTH - 160;
+    }
+
+    function seededUnit(levelNumber: number, index: number): number {
+        const seed = Math.sin((levelNumber + 1) * 9283 + (index + 1) * 1237) * 43758.5453;
+        return seed - Math.floor(seed);
+    }
+
+    function randomLedgeScale(levelNumber: number, index: number, isAnchor = false): number {
+        const r = seededUnit(levelNumber, index);
+        const min = isAnchor ? 0.56 : 0.34;
+        const max = isAnchor ? 0.78 : 0.62;
+        return min + (max - min) * r;
+    }
+
+    function buildLayoutForLevel(levelNumber: number): PlatformConfig[] {
+        const platformCount = 5 + Math.min(5, Math.floor(levelNumber / 12));
+        const maxStepX = 410;
+        const minStepX = 230;
+        const minY = LEVEL_MIN_Y;
+        const maxY = LEVEL_MAX_Y;
+        const moveRight = movesRightForLevel(levelNumber);
+        const layout: PlatformConfig[] = [];
+
+        let prevX = moveRight ? 180 : GAME_WIDTH - 180;
+        let prevY = 850;
+
+        for (let i = 0; i < platformCount; i += 1) {
+            if (i === 0) {
+                layout.push({ x: prevX, y: prevY, scaleX: randomLedgeScale(levelNumber, i, true) });
+                continue;
+            }
+
+            const progress = i / (platformCount - 1);
+            const baseTargetX = 120 + progress * (GAME_WIDTH - 240);
+            const targetX = (moveRight ? baseTargetX : GAME_WIDTH - baseTargetX) + Phaser.Math.Between(-70, 70);
+            const rawDeltaX = targetX - prevX;
+            const direction = moveRight ? 1 : -1;
+            const deltaX = clamp(Math.abs(rawDeltaX), minStepX, maxStepX) * direction;
+            let nextX = clamp(prevX + deltaX, 110, GAME_WIDTH - 110);
+            if (moveRight) {
+                nextX = Math.max(nextX, prevX + minStepX * 0.66);
+            } else {
+                nextX = Math.min(nextX, prevX - minStepX * 0.66);
+            }
+            nextX = clamp(nextX, 110, GAME_WIDTH - 110);
+
+            // Neutral vertical walk: symmetric random step plus mild pull to center to prevent drift.
+            const centerY = 740;
+            const driftCorrection = (centerY - prevY) * 0.34;
+            const deltaY = Phaser.Math.Between(-90, 90) + driftCorrection;
+            let nextY = prevY + deltaY;
+            nextY = clamp(nextY, minY, maxY);
+
+            layout.push({
+                x: nextX,
+                y: nextY,
+                scaleX: randomLedgeScale(levelNumber, i),
             });
+
+            prevX = nextX;
+            prevY = nextY;
         }
+
         return layout;
+    }
+
+    function buildLayoutFromAnchor(levelNumber: number, anchorX: number, anchorY: number): PlatformConfig[] {
+        const base = buildLayoutForLevel(levelNumber);
+        const first = base[0];
+        const deltaX = anchorX - first.x;
+        const normalizedAnchorY = clamp(anchorY, ANCHOR_MIN_Y, ANCHOR_MAX_Y);
+        const deltaY = normalizedAnchorY - first.y;
+        return base.map((piece) => ({
+            x: clamp(piece.x + deltaX, 110, GAME_WIDTH - 110),
+            y: clamp(piece.y + deltaY, LEVEL_MIN_Y, LEVEL_MAX_Y),
+            scaleX: piece.scaleX,
+        }));
     }
 
     function buildLevels(totalLevels: number): LevelConfig[] {
         const levels: LevelConfig[] = [];
-        for (let i = 0; i < totalLevels; i += 1) {
-            const theme = BASE_LEVEL_THEMES[i % BASE_LEVEL_THEMES.length];
+        for (let levelNumber = 1; levelNumber <= totalLevels; levelNumber += 1) {
+            const theme = BASE_LEVEL_THEMES[(levelNumber - 1) % BASE_LEVEL_THEMES.length];
             levels.push({
-                title: `${theme.title} ${i + 1}`,
+                title: `${theme.title} ${levelNumber}`,
                 tint: theme.tint,
-                platformLayout: buildLayoutForLevel(i, theme.platformLayout),
-                starCount: 12 + Math.min(24, Math.floor(i / 4)),
-                targetBombs: 1 + Math.min(24, i),
-                bombSpeed: 140 + Math.min(260, i * 3),
+                platformLayout: buildLayoutForLevel(levelNumber),
+                starCount: 10 + Math.min(16, Math.floor((levelNumber - 1) / 2)),
+                targetBombs: 1 + Math.min(24, levelNumber - 1),
+                bombSpeed: 140 + Math.min(260, (levelNumber - 1) * 4),
             });
         }
         return levels;
     }
 
-    const LEVELS: LevelConfig[] = buildLevels(100);
-
     const GAME_WIDTH = 1400;
     const GAME_HEIGHT = 1000;
+    const TOTAL_LEVELS = 100;
+    const LEVELS: LevelConfig[] = buildLevels(TOTAL_LEVELS);
+    const BASE_CAMERA_ZOOM = 1.06;
+    const BACKGROUND_SCALE = 5;
+    const BACKGROUND_SECTION_GRID = 5;
     const GAME_CONTAINER_ID = "game-root";
     const PLAYER_NAME_KEY = "nftgame.playerName";
     const PLAYER_NFT_KEY = "nftgame.playerNft";
@@ -138,13 +188,22 @@
     const WORLD_GRAVITY_Y = 320;
     const API_BASE_URL = "https://nftgame-server.vercel.app";
     const PLAYER_BOMB_SAFE_DISTANCE = 260;
+    const PENDING_SCORES_KEY = "nftgame.pendingScores";
+    const SCORE_POST_TIMEOUT_MS = 12000;
+    const SCORE_RETRY_DELAYS_MS = [700, 1800, 3500];
+    const CAMERA_NEAR_MISS_DISTANCE = 135;
+    const CAMERA_NEAR_MISS_COOLDOWN_MS = 550;
+    const LEVEL_MIN_Y = 460;
+    const LEVEL_MAX_Y = 860;
+    const ANCHOR_MIN_Y = 650;
+    const ANCHOR_MAX_Y = 860;
+    const BOMB_VISIBLE_TOP_Y = 80;
 
     let game: Phaser.Game | null = null;
     let sceneRef: Phaser.Scene | null = null;
     let background: Phaser.GameObjects.Image | null = null;
-    let farLayer: Phaser.GameObjects.TileSprite | null = null;
-    let nearLayer: Phaser.GameObjects.TileSprite | null = null;
     let glowOverlay: Phaser.GameObjects.Rectangle | null = null;
+    let ambienceParticles: Phaser.GameObjects.Particles.ParticleEmitterManager | null = null;
     let platforms: Phaser.Physics.Arcade.StaticGroup;
     let stars: Phaser.Physics.Arcade.Group;
     let bombs: Phaser.Physics.Arcade.Group;
@@ -174,6 +233,19 @@
     let runtimeSpriteObjectUrl: string | null = null;
     let jumpHoldTimeMs = 0;
     let jumpPressedLastFrame = false;
+    let onWindowOnline: (() => void) | undefined;
+    let pendingSyncCount = 0;
+    let scorePulse = false;
+    let comboPulse = false;
+    let levelPulse = false;
+    let scorePulseTimer: number | undefined;
+    let comboPulseTimer: number | undefined;
+    let levelPulseTimer: number | undefined;
+    let lastNearMissShakeAt = 0;
+    let isLevelTransitioning = false;
+    let touchLeftActive = false;
+    let touchRightActive = false;
+    let touchJumpActive = false;
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
 
@@ -347,6 +419,87 @@
         }
     }
 
+    function readPendingScores():
+        Array<{ token: string; imageURL: string; score: number; playerName: string }> {
+        if (typeof window === "undefined") {
+            return [];
+        }
+        const raw = localStorage.getItem(PENDING_SCORES_KEY);
+        if (!raw) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function refreshPendingSyncCount() {
+        pendingSyncCount = readPendingScores().length;
+    }
+
+    function writePendingScores(
+        scores: Array<{ token: string; imageURL: string; score: number; playerName: string }>,
+    ) {
+        if (typeof window === "undefined") {
+            return;
+        }
+        localStorage.setItem(PENDING_SCORES_KEY, JSON.stringify(scores));
+        pendingSyncCount = scores.length;
+    }
+
+    function queuePendingScore(payload: { token: string; imageURL: string; score: number; playerName: string }) {
+        const existing = readPendingScores();
+        existing.push(payload);
+        // Keep queue bounded.
+        if (existing.length > 40) {
+            existing.splice(0, existing.length - 40);
+        }
+        writePendingScores(existing);
+        console.warn("[GameDebug] queued pending score for retry", payload);
+    }
+
+    async function postScorePayload(payload: { token: string; imageURL: string; score: number; playerName: string }) {
+        await axios.post(`${API_BASE_URL}/scores`, payload, { timeout: SCORE_POST_TIMEOUT_MS });
+    }
+
+    async function postScoreWithRetry(payload: { token: string; imageURL: string; score: number; playerName: string }) {
+        let lastError: unknown = null;
+        for (let attempt = 0; attempt <= SCORE_RETRY_DELAYS_MS.length; attempt += 1) {
+            try {
+                await postScorePayload(payload);
+                return;
+            } catch (error) {
+                lastError = error;
+                if (attempt < SCORE_RETRY_DELAYS_MS.length) {
+                    const waitMs = SCORE_RETRY_DELAYS_MS[attempt];
+                    await new Promise((resolve) => setTimeout(resolve, waitMs));
+                }
+            }
+        }
+        throw lastError;
+    }
+
+    async function flushPendingScores() {
+        const pending = readPendingScores();
+        if (pending.length === 0) {
+            return;
+        }
+        console.log("[GameDebug] attempting to flush pending scores", { count: pending.length });
+        const remaining: typeof pending = [];
+        for (const payload of pending) {
+            try {
+                await postScoreWithRetry(payload);
+            } catch {
+                remaining.push(payload);
+            }
+        }
+        writePendingScores(remaining);
+        console.log("[GameDebug] pending score flush complete", { remaining: remaining.length });
+    }
+
     function resetSessionState() {
         score = 0;
         level = 1;
@@ -365,6 +518,8 @@
         uiLevel = 1;
         jumpHoldTimeMs = 0;
         jumpPressedLastFrame = false;
+        lastNearMissShakeAt = 0;
+        isLevelTransitioning = false;
     }
 
     function buildPlatforms(scene: Phaser.Scene, layout: PlatformConfig[]) {
@@ -374,7 +529,7 @@
         } else {
             platforms.clear(true, true);
         }
-        platforms.create(700, 1050, "ground").setScale(4).refreshBody();
+        platforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, "ground").setScale(4, 1).refreshBody();
 
         layout.forEach((piece) => {
             const platform = platforms.create(piece.x, piece.y, "ground");
@@ -384,18 +539,113 @@
         });
     }
 
+    function platformTargetsForLayout(layout: PlatformConfig[]): PlatformConfig[] {
+        return [{ x: GAME_WIDTH / 2, y: GAME_HEIGHT - 10, scaleX: 4 }, ...layout];
+    }
+
+    function animatePlatformsToLayout(scene: Phaser.Scene, layout: PlatformConfig[], durationMs: number) {
+        if (!platforms) {
+            buildPlatforms(scene, layout);
+            return;
+        }
+        const targets = platformTargetsForLayout(layout);
+        const current = platforms.getChildren() as Phaser.Physics.Arcade.Image[];
+
+        while (current.length < targets.length) {
+            const target = targets[current.length];
+            const created = platforms.create(target.x, target.y, "ground") as Phaser.Physics.Arcade.Image;
+            created.setScale(target.scaleX ?? 1, 1).refreshBody();
+            current.push(created);
+        }
+        while (current.length > targets.length) {
+            const stale = current.pop();
+            stale?.destroy();
+        }
+
+        current.forEach((platform, index) => {
+            const target = targets[index];
+            scene.tweens.add({
+                targets: platform,
+                x: target.x,
+                y: target.y,
+                scaleX: target.scaleX ?? 1,
+                scaleY: 1,
+                duration: durationMs,
+                ease: "Sine.easeInOut",
+                onUpdate: () => {
+                    platform.refreshBody();
+                },
+                onComplete: () => {
+                    platform.refreshBody();
+                },
+            });
+        });
+    }
+
+    function sequentialRevealDurationMs(layoutLength: number): number {
+        const intervalMs = 240;
+        return Math.max(460, (layoutLength - 1) * intervalMs + 420);
+    }
+
+    function buildPlatformsSequential(
+        scene: Phaser.Scene,
+        layout: PlatformConfig[],
+        preservePlayerOnAnchor: boolean,
+    ): number {
+        if (!platforms) {
+            platforms = scene.physics.add.staticGroup();
+        } else {
+            platforms.clear(true, true);
+        }
+
+        const anchor = layout[0];
+        const ground = platforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, "ground");
+        ground.setScale(4, 1).refreshBody();
+        const anchorPlatform = platforms.create(anchor.x, anchor.y, "ground");
+        anchorPlatform.setScale(anchor.scaleX ?? 0.72, 1).refreshBody();
+
+        if (preservePlayerOnAnchor && player) {
+            player.x = anchor.x;
+            player.y = anchor.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
+            player.setVelocity(0, 0);
+        }
+
+        const remaining = layout
+            .slice(1)
+            .sort((a, b) => {
+                const da = Math.abs(a.x - anchor.x) + Math.abs(a.y - anchor.y);
+                const db = Math.abs(b.x - anchor.x) + Math.abs(b.y - anchor.y);
+                return da - db;
+            });
+
+        const intervalMs = 240;
+        remaining.forEach((piece, idx) => {
+            scene.time.delayedCall((idx + 1) * intervalMs, () => {
+                const platform = platforms.create(piece.x, piece.y + 18, "ground");
+                platform.setScale(piece.scaleX ?? 1, 1).setAlpha(0).refreshBody();
+                scene.tweens.add({
+                    targets: platform,
+                    y: piece.y,
+                    alpha: 1,
+                    duration: 360,
+                    ease: "Sine.easeOut",
+                    onUpdate: () => platform.refreshBody(),
+                    onComplete: () => platform.refreshBody(),
+                });
+            });
+        });
+
+        return sequentialRevealDurationMs(layout.length);
+    }
+
     function placePlayerAtLevelStart() {
         if (!player) {
             return;
         }
-        const lowestLedge = activeLevelConfig().platformLayout.reduce((acc, piece) => {
-            if (piece.y > acc.y) {
-                return piece;
-            }
-            return acc;
-        }, activeLevelConfig().platformLayout[0]);
-        const spawnX = lowestLedge.x;
-        const spawnY = lowestLedge.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
+        const layout = activeLevelConfig().platformLayout;
+        const startLedge = layout[0];
+        const spawnX = startLedge.x;
+        const spawnY = startLedge.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
         const body = player.body as Phaser.Physics.Arcade.Body;
         body.reset(spawnX, spawnY);
         player.clearTint();
@@ -404,8 +654,100 @@
             level,
             spawnX,
             spawnY,
-            lowestLedgeY: lowestLedge.y,
+            startLedgeY: startLedge.y,
         });
+    }
+
+    function getCurrentAnchorLedge(): { x: number; y: number } {
+        if (!player || !platforms) {
+            return { x: 180, y: 850 };
+        }
+        const candidates = platforms.getChildren() as Phaser.Physics.Arcade.Image[];
+        const playerFootY = player.y + player.displayHeight * 0.45;
+        let best = candidates[0];
+        let bestScore = Number.POSITIVE_INFINITY;
+        candidates.forEach((platform) => {
+            const dx = Math.abs(platform.x - player.x);
+            const dy = Math.abs(platform.y - playerFootY);
+            const score = dx + dy * 1.2;
+            if (score < bestScore) {
+                best = platform;
+                bestScore = score;
+            }
+        });
+        return { x: best?.x ?? player.x, y: best?.y ?? player.y + 90 };
+    }
+
+    function getCurrentAnchorPlatform(): Phaser.Physics.Arcade.Image | null {
+        if (!player || !platforms) {
+            return null;
+        }
+        const candidates = platforms.getChildren() as Phaser.Physics.Arcade.Image[];
+        const playerFootY = player.y + player.displayHeight * 0.45;
+        const onTopCandidates = candidates.filter((platform) => {
+            const dx = Math.abs(platform.x - player.x);
+            const dy = Math.abs(platform.y - playerFootY);
+            const halfWidth = (platform.displayWidth || 120) / 2;
+            return dx <= halfWidth + 24 && dy <= 84;
+        });
+        const pool = onTopCandidates.length > 0 ? onTopCandidates : candidates;
+
+        let best: Phaser.Physics.Arcade.Image | null = null;
+        let bestScore = Number.POSITIVE_INFINITY;
+        pool.forEach((platform) => {
+            const dx = Math.abs(platform.x - player.x);
+            const dy = Math.abs(platform.y - playerFootY);
+            const score = dy * 1.6 + dx;
+            if (score < bestScore) {
+                best = platform;
+                bestScore = score;
+            }
+        });
+        return best;
+    }
+
+    function centerZoomedCamera(scene: Phaser.Scene) {
+        const camera = scene.cameras.main;
+        const visibleWidth = GAME_WIDTH / camera.zoom;
+        const visibleHeight = GAME_HEIGHT / camera.zoom;
+        camera.setScroll((GAME_WIDTH - visibleWidth) / 2, (GAME_HEIGHT - visibleHeight) / 2);
+    }
+
+    function backgroundTargetPositionForLevel(levelNumber: number) {
+        const sectionIndex = (levelNumber - 1) % (BACKGROUND_SECTION_GRID * BACKGROUND_SECTION_GRID);
+        const rowFromBottom = Math.floor(sectionIndex / BACKGROUND_SECTION_GRID);
+        const indexInRow = sectionIndex % BACKGROUND_SECTION_GRID;
+        const col = rowFromBottom % 2 === 0 ? indexInRow : BACKGROUND_SECTION_GRID - 1 - indexInRow;
+        const u = (col + 0.5) / BACKGROUND_SECTION_GRID;
+        const v = 1 - (rowFromBottom + 0.5) / BACKGROUND_SECTION_GRID;
+        const displayWidth = GAME_WIDTH * BACKGROUND_SCALE;
+        const displayHeight = GAME_HEIGHT * BACKGROUND_SCALE;
+        return {
+            x: GAME_WIDTH / 2 + displayWidth * (0.5 - u),
+            y: GAME_HEIGHT / 2 + displayHeight * (0.5 - v),
+            sectionIndex: sectionIndex + 1,
+        };
+    }
+
+    function applyBackgroundSection(scene: Phaser.Scene, levelNumber: number, animate: boolean) {
+        if (!background) {
+            return;
+        }
+        const target = backgroundTargetPositionForLevel(levelNumber);
+        if (!animate) {
+            background.setPosition(target.x, target.y);
+            console.log("[GameDebug] background section set", { level: levelNumber, section: target.sectionIndex });
+            return;
+        }
+
+        scene.tweens.add({
+            targets: background,
+            x: target.x,
+            y: target.y,
+            duration: 2700,
+            ease: "Sine.easeInOut",
+        });
+        console.log("[GameDebug] background section tween", { level: levelNumber, section: target.sectionIndex });
     }
 
     function normalizePlayerSprite(scene: Phaser.Scene) {
@@ -449,10 +791,30 @@
         const bomb = bombs.create(x, 16, "bomb");
         bomb.setBounce(1);
         bomb.setCollideWorldBounds(true);
+        applyBombStyle(bomb as Phaser.Physics.Arcade.Image);
         bomb.setVelocity(
             Phaser.Math.Between(-speedBase, speedBase),
             Phaser.Math.Between(80, 160),
         );
+    }
+
+    function bombStyleForLevel(currentLevel: number): BombStyle {
+        const tier = Math.min(4, Math.floor((currentLevel - 1) / 20));
+        const styles: BombStyle[] = [
+            { tint: 0xffffff, scale: 1 },
+            { tint: 0xffe29b, scale: 1.04 },
+            { tint: 0xffb59b, scale: 1.08 },
+            { tint: 0xff9bcf, scale: 1.12 },
+            { tint: 0xff8f8f, scale: 1.16 },
+        ];
+        return styles[tier];
+    }
+
+    function applyBombStyle(bomb: Phaser.Physics.Arcade.Image) {
+        const style = bombStyleForLevel(level);
+        bomb.setTint(style.tint);
+        bomb.setScale(style.scale);
+        bomb.setAlpha(0.96);
     }
 
     function enforceBombSafeZone(scene: Phaser.Scene, speedBase: number) {
@@ -495,6 +857,26 @@
         for (let i = 0; i < missing; i += 1) {
             spawnBomb(scene, activeLevelConfig().bombSpeed);
         }
+        bombs.children.each((child) => {
+            const bomb = child as Phaser.Physics.Arcade.Image;
+            if (bomb?.active) {
+                applyBombStyle(bomb);
+            }
+        });
+    }
+
+    function keepBombsVisible() {
+        bombs?.children.each((child) => {
+            const bomb = child as Phaser.Physics.Arcade.Image;
+            if (!bomb?.active) {
+                return;
+            }
+            if (bomb.y < BOMB_VISIBLE_TOP_Y) {
+                bomb.y = BOMB_VISIBLE_TOP_Y;
+                const body = bomb.body as Phaser.Physics.Arcade.Body;
+                body.velocity.y = Math.max(120, Math.abs(body.velocity.y));
+            }
+        });
     }
 
     function resetStars() {
@@ -508,9 +890,17 @@
         }
 
         const totalStars = activeLevelConfig().starCount;
+        const layout = activeLevelConfig().platformLayout;
         for (let i = 0; i < totalStars; i += 1) {
-            const star = stars.create(30 + i * 78, 0, "star") as Phaser.Physics.Arcade.Image;
-            star.setBounceY(Phaser.Math.FloatBetween(0.2, 0.8));
+            const platform = layout[i % layout.length];
+            const platformRow = Math.floor(i / layout.length);
+            const estimatedPlatformWidth = 128 * (platform.scaleX ?? 1);
+            const xJitter = Math.max(8, Math.min(26, estimatedPlatformWidth * 0.22));
+            const x = clamp(platform.x + Phaser.Math.Between(-xJitter, xJitter), 40, GAME_WIDTH - 40);
+            const y = clamp(platform.y - 170 - platformRow * 34, 25, GAME_HEIGHT - 130);
+            const star = stars.create(x, y, "star") as Phaser.Physics.Arcade.Image;
+            star.setBounceY(Phaser.Math.FloatBetween(0.05, 0.16));
+            star.setCollideWorldBounds(true);
         }
 
         stars.children.iterate((child) => {
@@ -520,6 +910,16 @@
     }
 
     function levelBanner(scene: Phaser.Scene, text: string) {
+        const flash = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0.22);
+        flash.setBlendMode(Phaser.BlendModes.ADD);
+        scene.tweens.add({
+            targets: flash,
+            alpha: 0,
+            duration: 320,
+            ease: "Cubic.easeOut",
+            onComplete: () => flash.destroy(),
+        });
+
         const banner = scene.add.text(GAME_WIDTH / 2, 170, text, {
             fontFamily: "Georgia, serif",
             fontSize: "42px",
@@ -530,6 +930,14 @@
         banner.setOrigin(0.5);
         scene.tweens.add({
             targets: banner,
+            scale: { from: 0.84, to: 1.08 },
+            yoyo: true,
+            repeat: 1,
+            duration: 280,
+            ease: "Back.easeOut",
+        });
+        scene.tweens.add({
+            targets: banner,
             alpha: { from: 1, to: 0 },
             y: 140,
             duration: 1200,
@@ -537,33 +945,102 @@
         });
     }
 
-    function applyLevelTheme(scene: Phaser.Scene, showBanner = false) {
+    function triggerHudPulse(kind: "score" | "combo" | "level") {
+        const durationMs = 220;
+        if (kind === "score") {
+            scorePulse = false;
+            if (scorePulseTimer) {
+                clearTimeout(scorePulseTimer);
+            }
+            scorePulse = true;
+            scorePulseTimer = window.setTimeout(() => {
+                scorePulse = false;
+            }, durationMs);
+            return;
+        }
+        if (kind === "combo") {
+            comboPulse = false;
+            if (comboPulseTimer) {
+                clearTimeout(comboPulseTimer);
+            }
+            comboPulse = true;
+            comboPulseTimer = window.setTimeout(() => {
+                comboPulse = false;
+            }, durationMs);
+            return;
+        }
+        levelPulse = false;
+        if (levelPulseTimer) {
+            clearTimeout(levelPulseTimer);
+        }
+        levelPulse = true;
+        levelPulseTimer = window.setTimeout(() => {
+            levelPulse = false;
+        }, durationMs + 80);
+    }
+
+    function applyLevelTheme(scene: Phaser.Scene, showBanner = false, options: LevelThemeOptions = {}) {
         const config = activeLevelConfig();
         console.log("[GameDebug] applyLevelTheme", { level, title: config.title, showBanner });
+        if (options.anchor) {
+            config.platformLayout = buildLayoutFromAnchor(level, options.anchor.x, options.anchor.y);
+        }
         levelThemeName = config.title;
         if (background) {
-            background.setTint(config.tint);
-        }
-        if (farLayer) {
-            farLayer.setTint(config.tint);
-        }
-        if (nearLayer) {
-            nearLayer.setTint(config.tint);
+            background.clearTint();
         }
         if (glowOverlay) {
-            glowOverlay.setFillStyle(config.tint, 0.08);
+            glowOverlay.setFillStyle(config.tint, 0.05);
         }
+        if (!options.skipBackgroundPan) {
+            applyBackgroundSection(scene, level, showBanner && level > 1);
+        }
+        scene.cameras.main.setZoom(BASE_CAMERA_ZOOM);
+        centerZoomedCamera(scene);
 
-        buildPlatforms(scene, config.platformLayout);
-        resetStars();
-        placePlayerAtLevelStart();
-        syncBombCount(scene);
-        enforceBombSafeZone(scene, config.bombSpeed);
+        const finalizeSpawns = () => {
+            resetStars();
+            syncBombCount(scene);
+            enforceBombSafeZone(scene, config.bombSpeed);
+        };
+
+        if (options.sequentialReveal) {
+            const revealMs = buildPlatformsSequential(scene, config.platformLayout, Boolean(options.preservePlayer));
+            scene.time.delayedCall(revealMs, finalizeSpawns);
+        } else if (options.platformTransitionMs && options.platformTransitionMs > 0) {
+            animatePlatformsToLayout(scene, config.platformLayout, options.platformTransitionMs);
+            resetStars();
+            if (!options.preservePlayer) {
+                placePlayerAtLevelStart();
+            } else if (options.playerTransitionMs && options.playerTransitionMs > 0 && player) {
+                const startLedge = config.platformLayout[0];
+                const targetY = startLedge.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
+                scene.tweens.add({
+                    targets: player,
+                    x: startLedge.x,
+                    y: targetY,
+                    duration: options.playerTransitionMs,
+                    ease: "Sine.easeInOut",
+                });
+            }
+            syncBombCount(scene);
+            enforceBombSafeZone(scene, config.bombSpeed);
+        } else {
+            buildPlatforms(scene, config.platformLayout);
+            resetStars();
+            if (!options.preservePlayer) {
+                placePlayerAtLevelStart();
+            }
+            syncBombCount(scene);
+            enforceBombSafeZone(scene, config.bombSpeed);
+        }
         uiLevel = level;
         comboMultiplier = 1;
         uiCombo = 1;
+        triggerHudPulse("level");
         playTone(480 + level * 30, 120, 0.025, "triangle");
         playTone(610 + level * 30, 150, 0.02, "triangle");
+        scene.cameras.main.flash(220, 255, 255, 255, false);
 
         if (showBanner) {
             levelBanner(scene, `Level ${level}: ${config.title}`);
@@ -574,21 +1051,21 @@
         const selectedNft = $player1nft ?? getPersistedNft();
         submittingScore = true;
         scoreSaveError = "";
+        const payload = {
+            token: selectedNft?.tokenAddress ?? "",
+            imageURL: selectedNft?.imageURL ?? "",
+            score,
+            playerName: $playerName ?? "anonymous",
+        };
         try {
-            const originalTokenAddress = selectedNft?.tokenAddress ?? "";
-            const originalImageUrl = selectedNft?.imageURL ?? "";
-            await axios.post(`${API_BASE_URL}/scores`, {
-                token: originalTokenAddress,
-                imageURL: originalImageUrl,
-                score,
-                playerName: $playerName ?? "anonymous",
-            });
+            await postScoreWithRetry(payload);
             console.log("[GameDebug] score payload uses original NFT", {
-                token: originalTokenAddress,
-                imageURL: originalImageUrl,
+                token: payload.token,
+                imageURL: payload.imageURL,
             });
         } catch (error) {
-            scoreSaveError = "Unable to save score right now.";
+            queuePendingScore(payload);
+            scoreSaveError = "Score saved locally and will auto-sync when connection returns.";
             console.error("failed to save score", error);
         } finally {
             submittingScore = false;
@@ -602,11 +1079,25 @@
         }
         isDead = true;
         scorePosted = true;
+        isLevelTransitioning = false;
         this.physics.pause();
+        this.physics.world.timeScale = 0.38;
 
         const body = colliderPlayer as Phaser.Physics.Arcade.Sprite;
         body.setTint(0xff0000);
         playTone(140, 300, 0.045, "sawtooth");
+        this.cameras.main.shake(300, 0.013);
+        this.cameras.main.flash(180, 255, 80, 80, false);
+        this.tweens.add({
+            targets: this.cameras.main,
+            zoom: BASE_CAMERA_ZOOM + 0.08,
+            duration: 220,
+            ease: "Quad.easeOut",
+        });
+        await new Promise<void>((resolve) => {
+            this.time.delayedCall(260, () => resolve());
+        });
+        this.physics.world.timeScale = 1;
 
         latestScore = score;
         didBeatHighScore = score > highScoreValue;
@@ -626,6 +1117,8 @@
         score += points;
         uiScore = score;
         uiCombo = comboMultiplier;
+        triggerHudPulse("score");
+        triggerHudPulse("combo");
         console.log("[GameDebug] collectStar", { score, comboMultiplier, points, level });
         playTone(460 + comboMultiplier * 45, 90, 0.025, "square");
 
@@ -659,8 +1152,73 @@
 
         if (stars.countActive(true) === 0) {
             if (level < LEVELS.length) {
-                level += 1;
-                applyLevelTheme(this, true);
+                if (isLevelTransitioning) {
+                    return;
+                }
+                isLevelTransitioning = true;
+                player.setVelocity(0, 0);
+                const anchor = getCurrentAnchorLedge();
+                const anchorPlatform = getCurrentAnchorPlatform();
+                const nextLevel = level + 1;
+                const desiredAnchorX = anchorXForLevel(nextLevel);
+                const transitionDuration = 2700;
+                const platformObjects = (platforms.getChildren() as Phaser.Physics.Arcade.Image[]) ?? [];
+                const platformStartX = platformObjects.map((platform) => platform.x);
+                const playerStartX = player.x;
+                const playerStartY = player.y;
+                const anchorPlatformStartX = anchorPlatform?.x ?? playerStartX;
+                const anchorPlatformStartY = anchorPlatform?.y ?? playerStartY + 90;
+                const transitionShift = anchorPlatformStartX - desiredAnchorX;
+                const playerOffsetX = playerStartX - anchorPlatformStartX;
+                const playerOffsetY = playerStartY - anchorPlatformStartY;
+                this.cameras.main.flash(180, 255, 250, 210, false);
+                this.tweens.add({
+                    targets: this.cameras.main,
+                    zoom: BASE_CAMERA_ZOOM + 0.06,
+                    duration: 140,
+                    yoyo: true,
+                    ease: "Sine.easeInOut",
+                });
+                playTone(780, 120, 0.03, "triangle");
+                playTone(920, 120, 0.024, "triangle");
+                this.physics.pause();
+                applyBackgroundSection(this, nextLevel, true);
+                this.tweens.addCounter({
+                    from: 0,
+                    to: 1,
+                    duration: transitionDuration,
+                    ease: "Sine.easeInOut",
+                    onUpdate: (tween) => {
+                        const t = tween.getValue();
+                        platformObjects.forEach((platform, index) => {
+                            platform.x = platformStartX[index] - transitionShift * t;
+                            platform.refreshBody();
+                        });
+                        if (anchorPlatform) {
+                            player.x = anchorPlatform.x + playerOffsetX;
+                            player.y = anchorPlatform.y + playerOffsetY;
+                        } else {
+                            player.x = playerStartX - transitionShift * t;
+                            player.y = playerStartY;
+                        }
+                    },
+                    onComplete: () => {
+                        level = nextLevel;
+                        const anchoredX = desiredAnchorX;
+                        const revealMs = sequentialRevealDurationMs(activeLevelConfig().platformLayout.length);
+                        applyLevelTheme(this, true, {
+                            preservePlayer: true,
+                            anchor: { x: anchoredX, y: anchor.y },
+                            skipBackgroundPan: true,
+                            sequentialReveal: true,
+                        });
+                        this.time.delayedCall(revealMs + 80, () => {
+                            player.setVelocity(0, 0);
+                            this.physics.resume();
+                            isLevelTransitioning = false;
+                        });
+                    },
+                });
             } else {
                 resetStars();
                 syncBombCount(this);
@@ -689,8 +1247,6 @@
             }
         }
         this.load.image("sky", "./newsky.png");
-        this.load.image("sky-old", "./sky.png");
-        this.load.image("cityline", "./buildingpixelated.png");
         this.load.image("ground", "./platform.png");
         this.load.image("star", "./star.png");
         this.load.image("bomb", "./bomb.png");
@@ -703,13 +1259,29 @@
     function create(this: Phaser.Scene) {
         console.log("[GameDebug] create start");
         sceneRef = this;
+        this.physics.world.timeScale = 1;
+        this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        this.cameras.main.setZoom(BASE_CAMERA_ZOOM);
+        centerZoomedCamera(this);
         background = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, "sky");
-        farLayer = this.add.tileSprite(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30, GAME_WIDTH, GAME_HEIGHT, "sky-old");
-        farLayer.setAlpha(0.28);
-        nearLayer = this.add.tileSprite(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 260, GAME_WIDTH, 480, "cityline");
-        nearLayer.setAlpha(0.4);
-        glowOverlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x9bd5ff, 0.08);
+        background.setDisplaySize(GAME_WIDTH * BACKGROUND_SCALE, GAME_HEIGHT * BACKGROUND_SCALE);
+        applyBackgroundSection(this, 1, false);
+        glowOverlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x9bd5ff, 0.05);
         glowOverlay.setBlendMode(Phaser.BlendModes.SCREEN);
+        ambienceParticles = this.add.particles("star");
+        ambienceParticles.createEmitter({
+            x: { min: 0, max: GAME_WIDTH },
+            y: { min: -30, max: GAME_HEIGHT + 10 },
+            speedX: { min: -9, max: 9 },
+            speedY: { min: 10, max: 22 },
+            lifespan: 16000,
+            quantity: 1,
+            frequency: 230,
+            alpha: { start: 0.22, end: 0.02 },
+            scale: { start: 0.05, end: 0.01 },
+            blendMode: Phaser.BlendModes.SCREEN,
+        });
 
         player = this.physics.add.sprite(100, 450, "dude");
         normalizePlayerSprite(this);
@@ -723,7 +1295,6 @@
         applyLevelTheme(this, true);
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(bombs, platforms);
-        verifyAllLevelFirstLedgeReachability(this);
         console.log("[GameDebug] create complete");
     }
 
@@ -732,29 +1303,52 @@
             return;
         }
 
-        const drift = 0.15 + level * 0.04;
-        if (farLayer) {
-            farLayer.tilePositionX += drift;
-        }
-        if (nearLayer) {
-            nearLayer.tilePositionX += drift * 1.7;
+        const now = sceneRef?.time.now ?? 0;
+        let nearestBombDistance = Number.POSITIVE_INFINITY;
+        bombs?.children.each((child) => {
+            const bomb = child as Phaser.Physics.Arcade.Image;
+            if (!bomb?.active) {
+                return;
+            }
+            const distance = Phaser.Math.Distance.Between(player.x, player.y, bomb.x, bomb.y);
+            if (distance < nearestBombDistance) {
+                nearestBombDistance = distance;
+            }
+        });
+        keepBombsVisible();
+        if (
+            nearestBombDistance < CAMERA_NEAR_MISS_DISTANCE &&
+            now - lastNearMissShakeAt > CAMERA_NEAR_MISS_COOLDOWN_MS
+        ) {
+            sceneRef?.cameras.main.shake(110, 0.0017);
+            playTone(220, 45, 0.012, "triangle");
+            lastNearMissShakeAt = now;
         }
 
-        if (cursors.left.isDown) {
+        if (isLevelTransitioning) {
+            player.setVelocityX(0);
+            jumpPressedLastFrame = false;
+            return;
+        }
+
+        if (player.y > GAME_HEIGHT + 120) {
+            console.warn("[GameDebug] player fell below world, resetting position", { level });
+            placePlayerAtLevelStart();
+            return;
+        }
+
+        const moveLeft = Boolean(cursors.left.isDown || touchLeftActive);
+        const moveRight = Boolean(cursors.right.isDown || touchRightActive);
+
+        if (moveLeft && !moveRight) {
             player.setVelocityX(-PLAYER_MOVE_SPEED);
-            if (nearLayer) {
-                nearLayer.tilePositionX -= 1.6;
-            }
-        } else if (cursors.right.isDown) {
+        } else if (moveRight && !moveLeft) {
             player.setVelocityX(PLAYER_MOVE_SPEED);
-            if (nearLayer) {
-                nearLayer.tilePositionX += 1.6;
-            }
         } else {
             player.setVelocityX(0);
         }
 
-        const jumpPressed = Boolean(cursors.up.isDown);
+        const jumpPressed = Boolean(cursors.up.isDown || touchJumpActive);
         const body = player.body as Phaser.Physics.Arcade.Body;
         const dt = (sceneRef?.game.loop.delta ?? 16.67) / 1000;
 
@@ -783,6 +1377,18 @@
         location.reload();
     }
 
+    function setTouchControl(control: "left" | "right" | "jump", active: boolean) {
+        if (control === "left") {
+            touchLeftActive = active;
+            return;
+        }
+        if (control === "right") {
+            touchRightActive = active;
+            return;
+        }
+        touchJumpActive = active;
+    }
+
     async function backToMenu() {
         await push("/");
         location.reload();
@@ -793,6 +1399,13 @@
         hydratePersistedPlayerState();
         resetSessionState();
         runSanityChecks();
+        refreshPendingSyncCount();
+        void flushPendingScores();
+
+        onWindowOnline = () => {
+            void flushPendingScores();
+        };
+        window.addEventListener("online", onWindowOnline);
 
         onWindowError = (event: ErrorEvent) => {
             console.error("[GameDebug] window error", event.error ?? event.message);
@@ -809,7 +1422,7 @@
             height: GAME_HEIGHT,
             parent: GAME_CONTAINER_ID,
             scale: {
-                mode: Phaser.Scale.FIT,
+                mode: Phaser.Scale.ENVELOP,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
                 width: GAME_WIDTH,
                 height: GAME_HEIGHT,
@@ -854,11 +1467,23 @@
         if (debugTimerId) {
             clearTimeout(debugTimerId);
         }
+        if (scorePulseTimer) {
+            clearTimeout(scorePulseTimer);
+        }
+        if (comboPulseTimer) {
+            clearTimeout(comboPulseTimer);
+        }
+        if (levelPulseTimer) {
+            clearTimeout(levelPulseTimer);
+        }
         if (onWindowError) {
             window.removeEventListener("error", onWindowError);
         }
         if (onUnhandledRejection) {
             window.removeEventListener("unhandledrejection", onUnhandledRejection);
+        }
+        if (onWindowOnline) {
+            window.removeEventListener("online", onWindowOnline);
         }
         if (game) {
             game.destroy(true);
@@ -868,27 +1493,31 @@
             URL.revokeObjectURL(runtimeSpriteObjectUrl);
             runtimeSpriteObjectUrl = null;
         }
+        ambienceParticles = null;
     });
 </script>
 
 <div class="game-shell">
     <div id={GAME_CONTAINER_ID} class="game-canvas" />
+    {#if pendingSyncCount > 0}
+        <div class="sync-badge">Pending Sync: {pendingSyncCount}</div>
+    {/if}
     <div class="hud">
         <div class="hud-card player-card">
             <span class="label">Pilot</span>
             <span class="value">{$playerName || "Anonymous Panda"}</span>
         </div>
-        <div class="hud-card">
+        <div class="hud-card" class:level-pop={levelPulse}>
             <span class="label">Level</span>
             <span class="value">{uiLevel}/{LEVELS.length}</span>
             <span class="sub">{levelThemeName}</span>
         </div>
-        <div class="hud-card">
+        <div class="hud-card" class:score-pop={scorePulse}>
             <span class="label">Score</span>
             <span class="value">{uiScore}</span>
             <span class="sub">High {highScoreValue}</span>
         </div>
-        <div class="hud-card combo-card">
+        <div class="hud-card combo-card" class:combo-pop={comboPulse}>
             <span class="label">Combo</span>
             <span class="value">x{uiCombo}</span>
             <span class="sub">{uiCombo >= 4 ? "On fire" : "Build momentum"}</span>
@@ -915,9 +1544,48 @@
             </div>
         </div>
     {/if}
+
+    <div class="mobile-controls">
+        <button
+            class="control-btn"
+            class:active={touchLeftActive}
+            on:touchstart|preventDefault={() => setTouchControl("left", true)}
+            on:touchend|preventDefault={() => setTouchControl("left", false)}
+            on:touchcancel|preventDefault={() => setTouchControl("left", false)}
+        >
+            ◀
+        </button>
+        <button
+            class="control-btn jump-btn"
+            class:active={touchJumpActive}
+            on:touchstart|preventDefault={() => setTouchControl("jump", true)}
+            on:touchend|preventDefault={() => setTouchControl("jump", false)}
+            on:touchcancel|preventDefault={() => setTouchControl("jump", false)}
+        >
+            ▲
+        </button>
+        <button
+            class="control-btn"
+            class:active={touchRightActive}
+            on:touchstart|preventDefault={() => setTouchControl("right", true)}
+            on:touchend|preventDefault={() => setTouchControl("right", false)}
+            on:touchcancel|preventDefault={() => setTouchControl("right", false)}
+        >
+            ▶
+        </button>
+    </div>
 </div>
 
 <style>
+    :global(html),
+    :global(body),
+    :global(#app) {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+    }
+
     :global(:root) {
         --ui-shell-shadow: rgba(4, 10, 26, 0.55);
         --ui-border: rgba(219, 234, 255, 0.24);
@@ -928,17 +1596,19 @@
     }
 
     .game-shell {
-        position: relative;
-        width: min(96vw, 1400px);
-        border-radius: 16px;
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100dvh;
+        border-radius: 0;
         overflow: hidden;
-        box-shadow: 0 22px 52px var(--ui-shell-shadow);
+        box-shadow: none;
+        touch-action: none;
     }
 
     .game-canvas {
-        width: min(96vw, 1400px);
-        aspect-ratio: 14 / 10;
-        min-height: 420px;
+        width: 100%;
+        height: 100%;
         background: radial-gradient(circle at 20% 20%, #3e5a85 0%, #18253f 46%, #0c1423 100%);
     }
 
@@ -959,6 +1629,22 @@
         pointer-events: none;
     }
 
+    .sync-badge {
+        position: absolute;
+        top: 12px;
+        right: 16px;
+        z-index: 25;
+        border: 1px solid rgba(255, 180, 180, 0.7);
+        background: rgba(83, 15, 15, 0.85);
+        color: #ffe3e3;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        backdrop-filter: blur(3px);
+    }
+
     .hud-card {
         background: linear-gradient(155deg, rgba(9, 21, 46, 0.84), rgba(4, 12, 27, 0.76));
         border: 1px solid var(--ui-border);
@@ -977,6 +1663,61 @@
 
     .combo-card {
         box-shadow: inset 0 0 0 1px rgba(255, 145, 212, 0.25);
+    }
+
+    .score-pop {
+        animation: hudScorePop 220ms ease-out;
+    }
+
+    .combo-pop {
+        animation: hudComboPop 220ms ease-out;
+    }
+
+    .level-pop {
+        animation: hudLevelPop 280ms ease-out;
+    }
+
+    @keyframes hudScorePop {
+        0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 rgba(255, 233, 164, 0);
+        }
+        50% {
+            transform: scale(1.05);
+            box-shadow: 0 0 24px rgba(255, 219, 116, 0.44);
+        }
+        100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 rgba(255, 233, 164, 0);
+        }
+    }
+
+    @keyframes hudComboPop {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.06);
+            box-shadow: 0 0 24px rgba(255, 130, 196, 0.38);
+        }
+        100% {
+            transform: scale(1);
+            box-shadow: inset 0 0 0 1px rgba(255, 145, 212, 0.25);
+        }
+    }
+
+    @keyframes hudLevelPop {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.04);
+            box-shadow: 0 0 20px rgba(143, 210, 255, 0.35);
+        }
+        100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 rgba(143, 210, 255, 0);
+        }
     }
 
     .label {
@@ -1064,17 +1805,55 @@
         filter: brightness(1.03);
     }
 
-    @media (max-width: 900px) {
-        .game-shell {
-            border-radius: 10px;
-        }
+    .mobile-controls {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 16px;
+        display: none;
+        justify-content: center;
+        gap: 14px;
+        z-index: 35;
+        pointer-events: none;
+    }
 
+    .control-btn {
+        pointer-events: auto;
+        width: 66px;
+        height: 66px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(6, 14, 30, 0.76);
+        color: #eef4ff;
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1;
+        backdrop-filter: blur(3px);
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    .control-btn.jump-btn {
+        margin: 0 10px;
+    }
+
+    .control-btn.active {
+        background: rgba(255, 215, 138, 0.94);
+        color: #1f1300;
+        transform: scale(0.95);
+    }
+
+    @media (max-width: 900px) {
         .hud {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .value {
             font-size: 17px;
+        }
+
+        .mobile-controls {
+            display: flex;
         }
     }
 </style>

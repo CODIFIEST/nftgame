@@ -11,7 +11,7 @@
     let allTimeFallbackUsed = false;
 
     async function getSeasonScores() {
-        const result = await axios.get(`${API_BASE_URL}/scores`);
+        const result = await axios.get(`${API_BASE_URL}/scores`, { timeout: 10000 });
         console.log('season results', result.data)
         return result.data
         
@@ -19,13 +19,13 @@
 
     async function getAllTimeScores() {
         try {
-            const result = await axios.get(`${API_BASE_URL}/scores/all-time`);
+            const result = await axios.get(`${API_BASE_URL}/scores/all-time`, { timeout: 10000 });
             console.log('all-time results', result.data)
             allTimeFallbackUsed = false;
             return result.data
         } catch (error) {
             console.warn("all-time endpoint unavailable, falling back to current season scores", error);
-            const fallback = await axios.get(`${API_BASE_URL}/scores`);
+            const fallback = await axios.get(`${API_BASE_URL}/scores`, { timeout: 10000 });
             allTimeFallbackUsed = true;
             return fallback.data;
         }
@@ -47,14 +47,26 @@
     }
 
     onMount(async ()=> {
-        const fetchedSeasonScores = await getSeasonScores();
-        seasonScores = getTopUniqueScores(fetchedSeasonScores);
-        highscores.set(seasonScores);
-        console.log('season highscores', seasonScores);
+        try {
+            const fetchedSeasonScores = await getSeasonScores();
+            seasonScores = getTopUniqueScores(fetchedSeasonScores);
+            highscores.set(seasonScores);
+            console.log('season highscores', seasonScores);
+        } catch (error) {
+            console.error("failed to load season highscores", error);
+            seasonScores = [];
+            highscores.set([]);
+        }
 
-        const fetchedAllTimeScores = await getAllTimeScores();
-        allTimeScores = getTopUniqueScores(fetchedAllTimeScores);
-        console.log('all-time highscores', allTimeScores);
+        try {
+            const fetchedAllTimeScores = await getAllTimeScores();
+            allTimeScores = getTopUniqueScores(fetchedAllTimeScores);
+            console.log('all-time highscores', allTimeScores);
+        } catch (error) {
+            console.error("failed to load all-time highscores", error);
+            allTimeScores = [...seasonScores];
+            allTimeFallbackUsed = true;
+        }
 
     })
 

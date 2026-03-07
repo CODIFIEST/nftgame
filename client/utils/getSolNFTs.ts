@@ -103,10 +103,12 @@ function mapQuickNodeAsset(asset: QuickNodeAsset, collectionAddress: string): NF
 async function fetchWithHelius(address: string, rpcUrl: string, collectionAddress: string): Promise<NFT[]> {
     const config = {
         headers: { "Content-Type": "application/json" },
+        timeout: 15000,
     };
     const pageSize = 1000;
     const domainNFTs: NFT[] = [];
     let page = 1;
+    const maxPages = 20;
 
     while (true) {
         const data = {
@@ -130,7 +132,7 @@ async function fetchWithHelius(address: string, rpcUrl: string, collectionAddres
             domainNFTs.push(mapHeliusAsset(asset, collectionAddress));
         });
 
-        if (items.length < pageSize) {
+        if (items.length < pageSize || page >= maxPages) {
             break;
         }
         page += 1;
@@ -142,10 +144,12 @@ async function fetchWithHelius(address: string, rpcUrl: string, collectionAddres
 async function fetchWithQuickNode(address: string, rpcUrl: string, collectionAddress: string): Promise<NFT[]> {
     const config = {
         headers: { "Content-Type": "application/json" },
+        timeout: 15000,
     };
     const domainNFTs: NFT[] = [];
     const pageSize = 40;
     let page = 1;
+    const maxPages = 50;
 
     while (true) {
         const data = {
@@ -175,7 +179,7 @@ async function fetchWithQuickNode(address: string, rpcUrl: string, collectionAdd
 
         const totalPages = result?.totalPages ?? 0;
         const pageNumber = result?.pageNumber ?? page;
-        if (pageNumber >= totalPages || assets.length < pageSize) {
+        if (pageNumber >= totalPages || assets.length < pageSize || page >= maxPages) {
             break;
         }
         page += 1;
