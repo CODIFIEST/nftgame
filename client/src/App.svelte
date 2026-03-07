@@ -19,7 +19,6 @@
     let backgroundAudio: HTMLAudioElement | null = null;
     let resumeAudioOnGesture: (() => void) | null = null;
     let isMuted = false;
-    let isPortraitMobile = false;
 
     function toggleDisplay() {
         viewForm = !viewForm;
@@ -45,16 +44,6 @@
   };
 
   $: isGameRoute = $location === "/game";
-
-  function updateOrientationState() {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const isTouchDevice =
-      "ontouchstart" in window || navigator.maxTouchPoints > 0 || (navigator as any).msMaxTouchPoints > 0;
-    const portrait = window.matchMedia("(orientation: portrait)").matches;
-    isPortraitMobile = isTouchDevice && portrait;
-  }
 
   async function attemptLandscapeLock() {
     if (typeof window === "undefined" || !isGameRoute) {
@@ -105,9 +94,6 @@
       }
     };
 
-    updateOrientationState();
-    window.addEventListener("resize", updateOrientationState);
-    window.addEventListener("orientationchange", updateOrientationState);
     window.addEventListener("pointerdown", resumeAudioOnGesture);
     window.addEventListener("touchstart", resumeAudioOnGesture);
     window.addEventListener("touchend", resumeAudioOnGesture);
@@ -121,8 +107,6 @@
       window.removeEventListener("touchend", resumeAudioOnGesture);
       window.removeEventListener("keydown", resumeAudioOnGesture);
     }
-    window.removeEventListener("resize", updateOrientationState);
-    window.removeEventListener("orientationchange", updateOrientationState);
     if (backgroundAudio) {
       backgroundAudio.pause();
       backgroundAudio.currentTime = 0;
@@ -157,14 +141,6 @@
     </div>
   </div>
 
-  {#if isGameRoute && isPortraitMobile}
-    <div class="rotate-overlay">
-      <div class="rotate-card">
-        <h3>Rotate Device</h3>
-        <p>Use landscape orientation for gameplay.</p>
-      </div>
-    </div>
-  {/if}
 </main>
 
 <style>
@@ -195,34 +171,22 @@
     backdrop-filter: blur(4px);
   }
 
-  .rotate-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    display: grid;
-    place-items: center;
-    background: rgba(5, 10, 20, 0.84);
-    backdrop-filter: blur(2px);
-  }
+  @media (orientation: portrait) and (max-width: 1024px) {
+    .game-shell .game-content {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100dvh;
+      height: 100vw;
+      transform-origin: top left;
+      transform: rotate(90deg) translateY(-100%);
+      overflow: hidden;
+      padding: 0;
+    }
 
-  .rotate-card {
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(16, 26, 46, 0.92);
-    color: #e8f2ff;
-    border-radius: 14px;
-    padding: 20px 24px;
-    text-align: center;
-    width: min(320px, 85vw);
-  }
-
-  .rotate-card h3 {
-    margin: 0 0 6px;
-    font-size: 22px;
-    font-weight: 800;
-  }
-
-  .rotate-card p {
-    margin: 0;
-    color: #c4d9f7;
+    .game-shell .game-content > .w-full {
+      width: 100%;
+      height: 100%;
+    }
   }
 </style>
