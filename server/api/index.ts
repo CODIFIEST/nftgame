@@ -84,14 +84,6 @@ async function readAllScores(): Promise<HighScore[]> {
     return cleanData;
 }
 
-function seasonBreakdown(scores: HighScore[]): Record<string, number> {
-    return scores.reduce((acc, score) => {
-        const key = score.season || "(missing)";
-        acc[key] = (acc[key] ?? 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-}
-
 export function createApp() {
     const app = express();
     app.use(express.json());
@@ -99,10 +91,6 @@ export function createApp() {
     app.options("*", cors(corsOptions));
 
     app.get("/health", (_req, res) => {
-        console.log("[ScoreAPI] /health", {
-            season: getCurrentSeason(),
-            deployedAt: new Date().toISOString(),
-        });
         res.status(200).send({
             ok: true,
             season: getCurrentSeason(),
@@ -117,12 +105,6 @@ export function createApp() {
                 : getCurrentSeason();
             const allScores = await readAllScores();
             const seasonScores = allScores.filter((score) => score.season === season);
-            console.log("[ScoreAPI] /scores", {
-                requestedSeason: season,
-                totalCount: allScores.length,
-                seasonCount: seasonScores.length,
-                breakdown: seasonBreakdown(allScores),
-            });
             res.status(200).send(seasonScores);
         } catch (error) {
             res.status(500).send({ error: "Failed to load scores." });
@@ -132,10 +114,6 @@ export function createApp() {
     app.get("/scores/all-time", async (_req, res) => {
         try {
             const scores = await readAllScores();
-            console.log("[ScoreAPI] /scores/all-time", {
-                totalCount: scores.length,
-                breakdown: seasonBreakdown(scores),
-            });
             res.status(200).send(scores);
         } catch (error) {
             res.status(500).send({ error: "Failed to load all-time scores." });

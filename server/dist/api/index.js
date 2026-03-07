@@ -117,24 +117,12 @@ function readAllScores() {
         return cleanData;
     });
 }
-function seasonBreakdown(scores) {
-    return scores.reduce((acc, score) => {
-        var _a;
-        const key = score.season || "(missing)";
-        acc[key] = ((_a = acc[key]) !== null && _a !== void 0 ? _a : 0) + 1;
-        return acc;
-    }, {});
-}
 function createApp() {
     const app = (0, express_1.default)();
     app.use(express_1.default.json());
     app.use((0, cors_1.default)(corsOptions));
     app.options("*", (0, cors_1.default)(corsOptions));
     app.get("/health", (_req, res) => {
-        console.log("[ScoreAPI] /health", {
-            season: (0, season_1.getCurrentSeason)(),
-            deployedAt: new Date().toISOString(),
-        });
         res.status(200).send({
             ok: true,
             season: (0, season_1.getCurrentSeason)(),
@@ -148,12 +136,6 @@ function createApp() {
                 : (0, season_1.getCurrentSeason)();
             const allScores = yield readAllScores();
             const seasonScores = allScores.filter((score) => score.season === season);
-            console.log("[ScoreAPI] /scores", {
-                requestedSeason: season,
-                totalCount: allScores.length,
-                seasonCount: seasonScores.length,
-                breakdown: seasonBreakdown(allScores),
-            });
             res.status(200).send(seasonScores);
         }
         catch (error) {
@@ -163,10 +145,6 @@ function createApp() {
     app.get("/scores/all-time", (_req, res) => __awaiter(this, void 0, void 0, function* () {
         try {
             const scores = yield readAllScores();
-            console.log("[ScoreAPI] /scores/all-time", {
-                totalCount: scores.length,
-                breakdown: seasonBreakdown(scores),
-            });
             res.status(200).send(scores);
         }
         catch (error) {

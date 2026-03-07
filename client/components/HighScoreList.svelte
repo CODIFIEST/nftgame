@@ -2,7 +2,7 @@
     import axios from "axios";
     import { onMount } from "svelte";
     import { getApiBaseUrl } from "../src/config/runtime";
-    import { trackError, trackInfo } from "../src/game/telemetry";
+    import { trackError } from "../src/game/telemetry";
     import highscores from "../src/stores/highscores";
     const API_BASE_URL = getApiBaseUrl();
     const currentDate = new Date();
@@ -19,23 +19,12 @@
                 season: currentSeason,
             },
         });
-        trackInfo("season_scores_response", {
-            apiBase: API_BASE_URL,
-            requestedSeason: currentSeason,
-            count: Array.isArray(result.data) ? result.data.length : -1,
-            seasons: Array.isArray(result.data) ? [...new Set(result.data.map((s: any) => s?.season ?? "(missing)"))] : [],
-        });
         return result.data
         
     }
 
     async function getAllTimeScores() {
         const result = await axios.get(`${API_BASE_URL}/scores/all-time`, { timeout: 10000 });
-        trackInfo("all_time_scores_response", {
-            apiBase: API_BASE_URL,
-            count: Array.isArray(result.data) ? result.data.length : -1,
-            seasons: Array.isArray(result.data) ? [...new Set(result.data.map((s: any) => s?.season ?? "(missing)"))] : [],
-        });
         allTimeFallbackUsed = false;
         return result.data
     }
@@ -61,11 +50,6 @@
         try {
             const fetchedSeasonScores = await getSeasonScores();
             seasonScores = getTopUniqueScores(fetchedSeasonScores, currentSeason);
-            trackInfo("season_scores_filtered", {
-                requestedSeason: currentSeason,
-                renderedCount: seasonScores.length,
-                renderedTokens: seasonScores.map((s: any) => s?.token ?? "(no-token)"),
-            });
             highscores.set(seasonScores);
         } catch (error) {
             trackError("season_highscores_load_failed", {
@@ -78,10 +62,6 @@
         try {
             const fetchedAllTimeScores = await getAllTimeScores();
             allTimeScores = getTopUniqueScores(fetchedAllTimeScores);
-            trackInfo("all_time_scores_filtered", {
-                renderedCount: allTimeScores.length,
-                renderedTokens: allTimeScores.map((s: any) => s?.token ?? "(no-token)"),
-            });
             allTimeUnavailable = false;
         } catch (error) {
             trackError("all_time_highscores_load_failed", {
