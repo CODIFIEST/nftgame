@@ -45,12 +45,13 @@ function normalizeScoreRecord(raw: unknown, id: string): HighScore | null {
     if (typeof data.score !== "number" || Number.isNaN(data.score)) {
         return null;
     }
+    const normalizedSeason = typeof data.season === "string" ? data.season.trim() : "";
     return {
         token: String(data.token ?? ""),
         imageURL: String(data.imageURL ?? ""),
         playerName: String(data.playerName ?? "anonymous"),
         score: Math.max(0, Math.floor(data.score)),
-        season: String(data.season ?? getCurrentSeason()),
+        season: normalizedSeason,
         id,
     };
 }

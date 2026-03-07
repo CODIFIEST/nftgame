@@ -15,4 +15,3 @@ export function assertGameRuntimeConfig(): void {
         console.error("[Config] Missing API base URL. Set VITE_API_BASE_URL.");
     }
 }
-

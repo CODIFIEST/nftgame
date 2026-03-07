@@ -73,17 +73,18 @@ const corsOptions = {
     optionsSuccessStatus: 204,
 };
 function normalizeScoreRecord(raw, id) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const data = (raw !== null && raw !== void 0 ? raw : {});
     if (typeof data.score !== "number" || Number.isNaN(data.score)) {
         return null;
     }
+    const normalizedSeason = typeof data.season === "string" ? data.season.trim() : "";
     return {
         token: String((_a = data.token) !== null && _a !== void 0 ? _a : ""),
         imageURL: String((_b = data.imageURL) !== null && _b !== void 0 ? _b : ""),
         playerName: String((_c = data.playerName) !== null && _c !== void 0 ? _c : "anonymous"),
         score: Math.max(0, Math.floor(data.score)),
-        season: String((_d = data.season) !== null && _d !== void 0 ? _d : (0, season_1.getCurrentSeason)()),
+        season: normalizedSeason,
         id,
     };
 }

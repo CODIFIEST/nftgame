@@ -33,6 +33,7 @@ VITE_QUICKNODE_APK=https://your-quicknode-endpoint
 2. `npm run build`
 
 # Runtime notes
-1. `VITE_API_BASE_URL` can override backend URL. Defaults to production server URL.
+1. `VITE_API_BASE_URL` can override backend URL.
+2. If unset, frontend defaults API to production backend URL.
 2. Game route is lazy-loaded to reduce initial bundle impact.
 3. Score posting has retry + pending queue sync with manual sync button in-game.

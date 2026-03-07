@@ -10,6 +10,7 @@
     import { assertGameRuntimeConfig } from "./config/runtime";
     let backgroundAudio: HTMLAudioElement | null = null;
     let resumeAudioOnGesture: (() => void) | null = null;
+    let onVisibilityChange: (() => void) | null = null;
     let isMuted = false;
     let isPhantomBrowser = false;
 
@@ -65,20 +66,22 @@
     backgroundAudio.volume = 0.45;
     backgroundAudio.muted = isMuted;
 
-    const startPlayback = async () => {
+    const startPlayback = async (): Promise<boolean> => {
       try {
         await backgroundAudio?.play();
+        return true;
       } catch (error) {
         // If autoplay is blocked, first user gesture will start playback.
+        return false;
       }
     };
 
     void startPlayback();
 
-    resumeAudioOnGesture = () => {
-      void startPlayback();
+    resumeAudioOnGesture = async () => {
+      const didStart = await startPlayback();
       void attemptLandscapeLock();
-      if (resumeAudioOnGesture) {
+      if (didStart && resumeAudioOnGesture) {
         window.removeEventListener("pointerdown", resumeAudioOnGesture);
         window.removeEventListener("touchstart", resumeAudioOnGesture);
         window.removeEventListener("touchend", resumeAudioOnGesture);
@@ -91,6 +94,13 @@
     window.addEventListener("touchstart", resumeAudioOnGesture);
     window.addEventListener("touchend", resumeAudioOnGesture);
     window.addEventListener("keydown", resumeAudioOnGesture);
+    window.addEventListener("focus", resumeAudioOnGesture);
+    onVisibilityChange = () => {
+      if (!document.hidden) {
+        void resumeAudioOnGesture?.();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
   });
 
   onDestroy(() => {
@@ -99,6 +109,11 @@
       window.removeEventListener("touchstart", resumeAudioOnGesture);
       window.removeEventListener("touchend", resumeAudioOnGesture);
       window.removeEventListener("keydown", resumeAudioOnGesture);
+      window.removeEventListener("focus", resumeAudioOnGesture);
+    }
+    if (onVisibilityChange) {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      onVisibilityChange = null;
     }
     if (backgroundAudio) {
       backgroundAudio.pause();
