@@ -19,6 +19,7 @@
     let backgroundAudio: HTMLAudioElement | null = null;
     let resumeAudioOnGesture: (() => void) | null = null;
     let isMuted = false;
+    let isPortraitMobile = false;
 
     function toggleDisplay() {
         viewForm = !viewForm;
@@ -45,10 +46,40 @@
 
   $: isGameRoute = $location === "/game";
 
+  function updateOrientationState() {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const isTouchDevice =
+      "ontouchstart" in window || navigator.maxTouchPoints > 0 || (navigator as any).msMaxTouchPoints > 0;
+    const portrait = window.matchMedia("(orientation: portrait)").matches;
+    isPortraitMobile = isTouchDevice && portrait;
+  }
+
+  async function attemptLandscapeLock() {
+    if (typeof window === "undefined" || !isGameRoute) {
+      return;
+    }
+    try {
+      const orientationApi = (screen as any).orientation;
+      if (orientationApi?.lock) {
+        await orientationApi.lock("landscape");
+      }
+    } catch {
+      // Some mobile browsers (especially iOS Safari) do not allow programmatic lock.
+    }
+  }
+
+  $: if (isGameRoute) {
+    void attemptLandscapeLock();
+  }
+
   onMount(() => {
     const trackUrl = encodeURI("/audio/colder still OST thingie 2-23-2026.mp3");
     backgroundAudio = new Audio(trackUrl);
     backgroundAudio.loop = true;
+    backgroundAudio.preload = "auto";
+    backgroundAudio.playsInline = true;
     backgroundAudio.volume = 0.45;
     backgroundAudio.muted = isMuted;
 
@@ -64,22 +95,34 @@
 
     resumeAudioOnGesture = () => {
       void startPlayback();
+      void attemptLandscapeLock();
       if (resumeAudioOnGesture) {
         window.removeEventListener("pointerdown", resumeAudioOnGesture);
+        window.removeEventListener("touchstart", resumeAudioOnGesture);
+        window.removeEventListener("touchend", resumeAudioOnGesture);
         window.removeEventListener("keydown", resumeAudioOnGesture);
         resumeAudioOnGesture = null;
       }
     };
 
+    updateOrientationState();
+    window.addEventListener("resize", updateOrientationState);
+    window.addEventListener("orientationchange", updateOrientationState);
     window.addEventListener("pointerdown", resumeAudioOnGesture);
+    window.addEventListener("touchstart", resumeAudioOnGesture);
+    window.addEventListener("touchend", resumeAudioOnGesture);
     window.addEventListener("keydown", resumeAudioOnGesture);
   });
 
   onDestroy(() => {
     if (resumeAudioOnGesture) {
       window.removeEventListener("pointerdown", resumeAudioOnGesture);
+      window.removeEventListener("touchstart", resumeAudioOnGesture);
+      window.removeEventListener("touchend", resumeAudioOnGesture);
       window.removeEventListener("keydown", resumeAudioOnGesture);
     }
+    window.removeEventListener("resize", updateOrientationState);
+    window.removeEventListener("orientationchange", updateOrientationState);
     if (backgroundAudio) {
       backgroundAudio.pause();
       backgroundAudio.currentTime = 0;
@@ -113,6 +156,15 @@
       </div>
     </div>
   </div>
+
+  {#if isGameRoute && isPortraitMobile}
+    <div class="rotate-overlay">
+      <div class="rotate-card">
+        <h3>Rotate Device</h3>
+        <p>Use landscape orientation for gameplay.</p>
+      </div>
+    </div>
+  {/if}
 </main>
 
 <style>
@@ -141,5 +193,36 @@
     font-weight: 700;
     cursor: pointer;
     backdrop-filter: blur(4px);
+  }
+
+  .rotate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    background: rgba(5, 10, 20, 0.84);
+    backdrop-filter: blur(2px);
+  }
+
+  .rotate-card {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(16, 26, 46, 0.92);
+    color: #e8f2ff;
+    border-radius: 14px;
+    padding: 20px 24px;
+    text-align: center;
+    width: min(320px, 85vw);
+  }
+
+  .rotate-card h3 {
+    margin: 0 0 6px;
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .rotate-card p {
+    margin: 0;
+    color: #c4d9f7;
   }
 </style>
