@@ -1422,7 +1422,7 @@
             height: GAME_HEIGHT,
             parent: GAME_CONTAINER_ID,
             scale: {
-                mode: Phaser.Scale.FIT,
+                mode: Phaser.Scale.ENVELOP,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
                 width: GAME_WIDTH,
                 height: GAME_HEIGHT,
@@ -1646,13 +1646,13 @@
     }
 
     .hud-card {
-        background: linear-gradient(155deg, rgba(9, 21, 46, 0.42), rgba(4, 12, 27, 0.34));
-        border: 1px solid rgba(219, 234, 255, 0.16);
+        background: linear-gradient(155deg, rgba(9, 21, 46, 0.24), rgba(4, 12, 27, 0.18));
+        border: 1px solid rgba(219, 234, 255, 0.1);
         border-radius: 12px;
         padding: 8px 12px 9px;
         display: grid;
         gap: 2px;
-        backdrop-filter: blur(2px);
+        backdrop-filter: blur(1.5px);
     }
 
     .player-card .value {
