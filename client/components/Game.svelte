@@ -35,6 +35,7 @@
     } from "../src/game/bombs";
     import { applyBackgroundSection } from "../src/game/background";
     import { runSanityChecks } from "../src/game/debug";
+    import { clearHudPulseTimers, triggerHudPulse as triggerHudPulseRuntime } from "../src/game/hudPulse";
     import { applyLevelTheme as applyLevelThemeRuntime, type LevelThemeOptions } from "../src/game/levelTheme";
     import { levelBanner, normalizePlayerSprite, resetStars as resetStarsForLevel } from "../src/game/levelVisuals";
     import { nextComboMultiplier, pointsForCombo, renderStarCollectFx } from "../src/game/starCollect";
@@ -112,9 +113,11 @@
     let scorePulse = false;
     let comboPulse = false;
     let levelPulse = false;
-    let scorePulseTimer: number | undefined;
-    let comboPulseTimer: number | undefined;
-    let levelPulseTimer: number | undefined;
+    const hudPulseTimers = {
+        scorePulseTimer: undefined as number | undefined,
+        comboPulseTimer: undefined as number | undefined,
+        levelPulseTimer: undefined as number | undefined,
+    };
     let lastNearMissShakeAt = 0;
     let isLevelTransitioning = false;
     let touchLeftActive = false;
@@ -231,40 +234,20 @@
     }
 
     function triggerHudPulse(kind: "score" | "combo" | "level") {
-        if (reducedMotion) {
-            return;
-        }
-        const durationMs = 220;
-        if (kind === "score") {
-            scorePulse = false;
-            if (scorePulseTimer) {
-                clearTimeout(scorePulseTimer);
-            }
-            scorePulse = true;
-            scorePulseTimer = window.setTimeout(() => {
-                scorePulse = false;
-            }, durationMs);
-            return;
-        }
-        if (kind === "combo") {
-            comboPulse = false;
-            if (comboPulseTimer) {
-                clearTimeout(comboPulseTimer);
-            }
-            comboPulse = true;
-            comboPulseTimer = window.setTimeout(() => {
-                comboPulse = false;
-            }, durationMs);
-            return;
-        }
-        levelPulse = false;
-        if (levelPulseTimer) {
-            clearTimeout(levelPulseTimer);
-        }
-        levelPulse = true;
-        levelPulseTimer = window.setTimeout(() => {
-            levelPulse = false;
-        }, durationMs + 80);
+        triggerHudPulseRuntime({
+            kind,
+            reducedMotion,
+            timers: hudPulseTimers,
+            setScorePulse: (value) => {
+                scorePulse = value;
+            },
+            setComboPulse: (value) => {
+                comboPulse = value;
+            },
+            setLevelPulse: (value) => {
+                levelPulse = value;
+            },
+        });
     }
 
     function applyLevelTheme(scene: Phaser.Scene, showBanner = false, options: LevelThemeOptions = {}) {
@@ -749,15 +732,7 @@
         if (debugTimerId) {
             clearTimeout(debugTimerId);
         }
-        if (scorePulseTimer) {
-            clearTimeout(scorePulseTimer);
-        }
-        if (comboPulseTimer) {
-            clearTimeout(comboPulseTimer);
-        }
-        if (levelPulseTimer) {
-            clearTimeout(levelPulseTimer);
-        }
+        clearHudPulseTimers(hudPulseTimers);
         if (onWindowError) {
             window.removeEventListener("error", onWindowError);
         }
