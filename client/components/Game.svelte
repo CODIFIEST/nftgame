@@ -25,7 +25,7 @@
         TOTAL_LEVELS,
         WORLD_GRAVITY_Y,
     } from "../src/game/constants";
-    import { ScoreSyncQueue, type ScorePayload } from "../src/game/scoreSync";
+    import { ScoreSyncQueue, isRetryableScoreError, type ScorePayload } from "../src/game/scoreSync";
     import { trackError, trackInfo } from "../src/game/telemetry";
     import { disposeAudio, playTone } from "../src/game/audio";
     import {
@@ -38,7 +38,21 @@
     import { clearHudPulseTimers, triggerHudPulse as triggerHudPulseRuntime } from "../src/game/hudPulse";
     import { applyLevelTheme as applyLevelThemeRuntime, type LevelThemeOptions } from "../src/game/levelTheme";
     import { levelBanner, normalizePlayerSprite, resetStars as resetStarsForLevel } from "../src/game/levelVisuals";
+    import { updatePlayerMotion } from "../src/game/playerMotion";
+    import { preloadCoreAssets, selectPlayerSpriteSource } from "../src/game/preloadAssets";
+    import { setupGameScene } from "../src/game/sceneSetup";
     import { advanceAfterStarClear } from "../src/game/progressionRuntime";
+    import {
+        buildScorePayload,
+        createRunSessionState,
+        ensureTicketForSubmissionOrFail,
+        handleRunTicketRequestError,
+        markLevelReached,
+        markRunStarted,
+        markStarCollected,
+        requestRunTicket as requestRunTicketRuntime,
+        resetRunSession,
+    } from "../src/game/runSession";
     import { nextComboMultiplier, pointsForCombo, renderStarCollectFx } from "../src/game/starCollect";
     import {
         buildLevels,
@@ -76,7 +90,6 @@
     let sceneRef: Phaser.Scene | null = null;
     let background: Phaser.GameObjects.Image | null = null;
     let glowOverlay: Phaser.GameObjects.Rectangle | null = null;
-    let ambienceParticles: Phaser.GameObjects.Particles.ParticleEmitterManager | null = null;
     let platforms: Phaser.Physics.Arcade.StaticGroup;
     let stars: Phaser.Physics.Arcade.Group;
     let bombs: Phaser.Physics.Arcade.Group;
@@ -130,12 +143,7 @@
     let reducedMotion = false;
     let leftHandedMobileControls = false;
     let onWindowKeydown: ((event: KeyboardEvent) => void) | undefined;
-    let runTicketId = "";
-    let runStartedAtIso = "";
-    let collectedStars = 0;
-    let maxComboReached = 1;
-    let maxLevelReached = 1;
-    let runTicketSupportAvailable: boolean | null = null;
+    const runSession = createRunSessionState();
 
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
     $: if (typeof window !== "undefined") {
@@ -157,20 +165,11 @@
     }
 
     async function requestRunTicket(): Promise<void> {
-        if (runTicketSupportAvailable === false) {
-            return;
-        }
         try {
-            const response = await axios.post<{ ticketId: string; issuedAt: string }>(
-                `${API_BASE_URL}/run-ticket`,
-                {},
-                { timeout: 8000 },
-            );
-            runTicketId = response.data.ticketId ?? "";
-            runTicketSupportAvailable = true;
+            await requestRunTicketRuntime(API_BASE_URL, runSession);
         } catch (error) {
-            if (axios.isAxiosError(error) && error.response?.status === 404) {
-                runTicketSupportAvailable = false;
+            handleRunTicketRequestError(error, runSession);
+            if (runSession.runTicketSupportAvailable === false) {
                 return;
             }
             console.error("[GameDebug] failed to request run ticket", error);
@@ -181,12 +180,11 @@
         if (!sceneRef || hasRunStarted || isDead) {
             return;
         }
-        if (!runTicketId) {
+        if (!runSession.runTicketId) {
             await requestRunTicket();
         }
         hasRunStarted = true;
-        runStartedAtIso = new Date().toISOString();
-        maxLevelReached = Math.max(maxLevelReached, level);
+        markRunStarted(runSession, level);
         showStartOverlay = false;
         isPaused = false;
         sceneRef.physics.resume();
@@ -212,6 +210,21 @@
 
     async function postScorePayload(payload: ScorePayload, timeoutMs: number) {
         await axios.post(`${API_BASE_URL}/scores`, payload, { timeout: timeoutMs });
+    }
+
+    function readScoreSaveErrorMessage(error: unknown): string {
+        if (axios.isAxiosError(error)) {
+            const status = error.response?.status;
+            const serverMessage =
+                typeof error.response?.data?.error === "string" ? error.response.data.error.trim() : "";
+            if (serverMessage) {
+                return `Score rejected: ${serverMessage}`;
+            }
+            if (typeof status === "number" && status >= 400 && status < 500 && status !== 429) {
+                return "Score rejected by server validation.";
+            }
+        }
+        return "Score saved locally and will auto-sync when connection returns.";
     }
 
     async function flushPendingScores() {
@@ -251,11 +264,7 @@
         jumpPressedLastFrame = false;
         lastNearMissShakeAt = 0;
         isLevelTransitioning = false;
-        runTicketId = "";
-        runStartedAtIso = "";
-        collectedStars = 0;
-        maxComboReached = 1;
-        maxLevelReached = 1;
+        resetRunSession(runSession);
     }
 
     function syncBombCount() {
@@ -341,30 +350,22 @@
         const selectedNft = $player1nft ?? getPersistedNft(PLAYER_NFT_KEY);
         submittingScore = true;
         scoreSaveError = "";
-        if (runTicketSupportAvailable !== false && !runTicketId) {
+        if (runSession.runTicketSupportAvailable !== false && !runSession.runTicketId) {
             await requestRunTicket();
         }
-        if (runTicketSupportAvailable !== false && !runTicketId) {
+        if (!ensureTicketForSubmissionOrFail(runSession)) {
             scoreSaveError = "Unable to verify run. Connect and retry.";
             submittingScore = false;
             return;
         }
-        const runEndedAt = new Date().toISOString();
-        const payload: ScorePayload = {
+        const payload: ScorePayload = buildScorePayload({
             token: selectedNft?.tokenAddress ?? "",
             imageURL: selectedNft?.imageURL ?? "",
             score,
             playerName: $playerName ?? "anonymous",
-            ticketId: runTicketSupportAvailable === false ? "legacy-ticketless" : runTicketId,
-            runStartedAt:
-                runTicketSupportAvailable === false
-                    ? new Date(Date.now() - 20_000).toISOString()
-                    : runStartedAtIso || new Date(Date.now() - 20_000).toISOString(),
-            runEndedAt,
-            collectedStars: Math.max(1, collectedStars),
-            maxCombo: Math.max(1, maxComboReached),
-            maxLevelReached: Math.max(1, maxLevelReached),
-        };
+            session: runSession,
+            fallbackStartedAt: new Date(Date.now() - 20_000).toISOString(),
+        });
         try {
             await scoreQueue.postWithRetry(payload, postScorePayload, SCORE_POST_TIMEOUT_MS, SCORE_RETRY_DELAYS_MS);
             refreshPendingSyncCount();
@@ -373,9 +374,11 @@
                 imageURL: payload.imageURL,
             });
         } catch (error) {
-            scoreQueue.enqueue(payload);
-            refreshPendingSyncCount();
-            scoreSaveError = "Score saved locally and will auto-sync when connection returns.";
+            if (isRetryableScoreError(error)) {
+                scoreQueue.enqueue(payload);
+                refreshPendingSyncCount();
+            }
+            scoreSaveError = readScoreSaveErrorMessage(error);
             console.error("failed to save score", error);
         } finally {
             submittingScore = false;
@@ -434,8 +437,7 @@
 
         const points = pointsForCombo(comboMultiplier);
         score += points;
-        collectedStars += 1;
-        maxComboReached = Math.max(maxComboReached, comboMultiplier);
+        markStarCollected(runSession, comboMultiplier);
         uiScore = score;
         uiCombo = comboMultiplier;
         triggerHudPulse("score");
@@ -456,7 +458,7 @@
                 },
                 setLevel: (value) => {
                     level = value;
-                    maxLevelReached = Math.max(maxLevelReached, value);
+                    markLevelReached(runSession, value);
                 },
                 player,
                 platforms,
@@ -479,62 +481,37 @@
         this.load.on("loaderror", (file: unknown) => console.error("[GameDebug] asset load error", file));
         const persistedImage =
             $playerImage || (typeof window !== "undefined" ? sessionStorage.getItem(PLAYER_IMAGE_KEY) : null) || "./dude.png";
-        if (runtimeSpriteObjectUrl) {
-            URL.revokeObjectURL(runtimeSpriteObjectUrl);
-            runtimeSpriteObjectUrl = null;
+        const selected = selectPlayerSpriteSource({
+            persistedImage,
+            currentObjectUrl: runtimeSpriteObjectUrl,
+            dataUrlToObjectUrl,
+        });
+        runtimeSpriteObjectUrl = selected.runtimeSpriteObjectUrl;
+        if (selected.runtimeSpriteObjectUrl) {
+            console.log("[GameDebug] converted data URI sprite to object URL for Phaser loader");
         }
-        let selectedPlayerImage = persistedImage;
-        if (persistedImage.startsWith("data:")) {
-            const objectUrl = dataUrlToObjectUrl(persistedImage);
-            if (objectUrl) {
-                runtimeSpriteObjectUrl = objectUrl;
-                selectedPlayerImage = objectUrl;
-                console.log("[GameDebug] converted data URI sprite to object URL for Phaser loader");
-            }
-        }
-        this.load.image("sky", "./newsky.png");
-        this.load.image("ground", "./platform.png");
-        this.load.image("star", "./star.png");
-        this.load.image("bomb", "./bomb.png");
-        this.load.image("dude", selectedPlayerImage);
+        preloadCoreAssets(this, selected.selectedPlayerImage);
     }
 
     function create(this: Phaser.Scene) {
         console.log("[GameDebug] create start");
         sceneRef = this;
-        this.physics.world.timeScale = 1;
-        this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
-        this.cameras.main.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
-        this.cameras.main.setZoom(BASE_CAMERA_ZOOM);
-        centerZoomedCamera(this);
-        background = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, "sky");
-        background.setDisplaySize(GAME_WIDTH * BACKGROUND_SCALE, GAME_HEIGHT * BACKGROUND_SCALE);
-        applyBackgroundSection(this, background, 1, false);
-        glowOverlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x9bd5ff, 0.05);
-        glowOverlay.setBlendMode(Phaser.BlendModes.SCREEN);
-        ambienceParticles = this.add.particles("star");
-        ambienceParticles.createEmitter({
-            x: { min: 0, max: GAME_WIDTH },
-            y: { min: -30, max: GAME_HEIGHT + 10 },
-            speedX: { min: -9, max: 9 },
-            speedY: { min: 10, max: 22 },
-            lifespan: 16000,
-            quantity: 1,
-            frequency: 230,
-            alpha: { start: 0.22, end: 0.02 },
-            scale: { start: 0.05, end: 0.01 },
-            blendMode: Phaser.BlendModes.SCREEN,
+        const setup = setupGameScene(this, {
+            gameWidth: GAME_WIDTH,
+            gameHeight: GAME_HEIGHT,
+            backgroundScale: BACKGROUND_SCALE,
+            baseCameraZoom: BASE_CAMERA_ZOOM,
+            hasRunStarted,
+            normalizePlayerSprite,
+            applyBackgroundSection,
+            hitBomb,
+            centerZoomedCamera,
         });
-
-        player = this.physics.add.sprite(100, 450, "dude");
-        normalizePlayerSprite(player, this);
-        player.setBounce(0.2);
-        player.setCollideWorldBounds(true);
-
-        bombs = this.physics.add.group();
-        this.physics.add.collider(player, bombs, hitBomb, undefined, this);
-
-        cursors = this.input.keyboard.createCursorKeys();
+        background = setup.background;
+        glowOverlay = setup.glowOverlay;
+        player = setup.player;
+        bombs = setup.bombs;
+        cursors = setup.cursors;
         applyLevelTheme(this, true);
         verifyAllLevelFirstLedgeReachability(this, LEVELS);
         this.physics.add.collider(player, platforms);
@@ -585,40 +562,23 @@
             return;
         }
 
-        const moveLeft = Boolean(cursors.left.isDown || touchLeftActive);
-        const moveRight = Boolean(cursors.right.isDown || touchRightActive);
-
-        if (moveLeft && !moveRight) {
-            player.setVelocityX(-PLAYER_MOVE_SPEED);
-        } else if (moveRight && !moveLeft) {
-            player.setVelocityX(PLAYER_MOVE_SPEED);
-        } else {
-            player.setVelocityX(0);
-        }
-
-        const jumpPressed = Boolean(cursors.up.isDown || touchJumpActive);
-        const body = player.body as Phaser.Physics.Arcade.Body;
-        const dt = (sceneRef?.game.loop.delta ?? 16.67) / 1000;
-
-        if (jumpPressed && !jumpPressedLastFrame && body.blocked.down) {
-            player.setVelocityY(JUMP_INITIAL_VELOCITY);
-            jumpHoldTimeMs = 0;
-        }
-
-        if (jumpPressed && body.velocity.y < 0 && jumpHoldTimeMs < JUMP_HOLD_MAX_MS) {
-            player.setVelocityY(body.velocity.y + JUMP_HOLD_ACCEL * dt);
-            jumpHoldTimeMs += dt * 1000;
-        }
-
-        if (!jumpPressed && body.velocity.y < JUMP_RELEASE_CUTOFF) {
-            player.setVelocityY(JUMP_RELEASE_CUTOFF);
-        }
-
-        if (body.blocked.down && !jumpPressed) {
-            jumpHoldTimeMs = 0;
-        }
-
-        jumpPressedLastFrame = jumpPressed;
+        const motion = updatePlayerMotion({
+            player,
+            cursors,
+            touchLeftActive,
+            touchRightActive,
+            touchJumpActive,
+            moveSpeed: PLAYER_MOVE_SPEED,
+            jumpInitialVelocity: JUMP_INITIAL_VELOCITY,
+            jumpHoldAccel: JUMP_HOLD_ACCEL,
+            jumpHoldMaxMs: JUMP_HOLD_MAX_MS,
+            jumpReleaseCutoff: JUMP_RELEASE_CUTOFF,
+            sceneDeltaMs: sceneRef?.game.loop.delta ?? 16.67,
+            jumpHoldTimeMs,
+            jumpPressedLastFrame,
+        });
+        jumpHoldTimeMs = motion.jumpHoldTimeMs;
+        jumpPressedLastFrame = motion.jumpPressedLastFrame;
     }
 
     function retryRun() {
@@ -775,7 +735,6 @@
             runtimeSpriteObjectUrl = null;
         }
         void disposeAudio();
-        ambienceParticles = null;
     });
 </script>
 

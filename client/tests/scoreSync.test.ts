@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ScoreSyncQueue, type ScorePayload } from "../src/game/scoreSync.js";
+import { isRetryableScoreError, ScoreSyncQueue, type ScorePayload } from "../src/game/scoreSync.js";
 
 type StorageMap = Record<string, string>;
 
@@ -58,5 +58,31 @@ test("flush clears pending records when post succeeds", async () => {
     assert.equal(remaining, 0);
     assert.equal(queue.getPendingCount(), 0);
     assert.ok(queue.getLastSyncAt());
+    cleanup();
+});
+
+test("isRetryableScoreError classifies HTTP status codes", () => {
+    assert.equal(isRetryableScoreError({ response: { status: 400 } }), false);
+    assert.equal(isRetryableScoreError({ response: { status: 429 } }), true);
+    assert.equal(isRetryableScoreError({ response: { status: 500 } }), true);
+    assert.equal(isRetryableScoreError(new Error("network down")), true);
+});
+
+test("postWithRetry does not retry non-retryable 4xx responses", async () => {
+    const cleanup = mockWindowStorage();
+    const queue = new ScoreSyncQueue("test.pending", "test.lastSync");
+    let attempts = 0;
+    await assert.rejects(
+        queue.postWithRetry(
+            payload,
+            async () => {
+                attempts += 1;
+                throw { response: { status: 400 } };
+            },
+            1000,
+            [1, 1, 1],
+        ),
+    );
+    assert.equal(attempts, 1);
     cleanup();
 });

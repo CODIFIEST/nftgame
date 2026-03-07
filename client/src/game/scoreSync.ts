@@ -37,6 +37,25 @@ function wait(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function readHttpStatus(error: unknown): number | null {
+    if (!error || typeof error !== "object") {
+        return null;
+    }
+    const candidate = (error as { response?: { status?: unknown } }).response?.status;
+    return typeof candidate === "number" ? candidate : null;
+}
+
+export function isRetryableScoreError(error: unknown): boolean {
+    const status = readHttpStatus(error);
+    if (status === null) {
+        return true;
+    }
+    if (status === 429) {
+        return true;
+    }
+    return status >= 500;
+}
+
 export class ScoreSyncQueue {
     private queueKey: string;
     private lastSyncKey: string;
@@ -120,6 +139,9 @@ export class ScoreSyncQueue {
                 return;
             } catch (error) {
                 lastError = error;
+                if (!isRetryableScoreError(error)) {
+                    break;
+                }
                 if (attempt < retryBaseDelaysMs.length) {
                     const base = retryBaseDelaysMs[attempt];
                     const jitter = Math.floor(Math.random() * 220);
