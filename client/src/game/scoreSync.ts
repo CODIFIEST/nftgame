@@ -162,8 +162,12 @@ export class ScoreSyncQueue {
         for (const payload of pending) {
             try {
                 await this.postWithRetry(payload, postScore, timeoutMs, retryBaseDelaysMs);
-            } catch {
-                remaining.push(payload);
+            } catch (error) {
+                if (isRetryableScoreError(error)) {
+                    remaining.push(payload);
+                } else {
+                    trackInfo("score_queue_dropped_non_retryable", { payload });
+                }
             }
         }
         this.write(remaining);

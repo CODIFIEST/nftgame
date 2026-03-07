@@ -69,15 +69,31 @@ export function enforceBombSafeZone(
     });
 }
 
-export function keepBombsVisible(bombs: BombGroup, visibleTopY: number): void {
+export function keepBombsVisible(
+    bombs: BombGroup,
+    visibleTopY: number,
+    visibleLeftX = 0,
+    visibleRightX = GAME_WIDTH,
+): void {
     bombs.children.each((child) => {
         const bomb = child as ArcadeImage;
         if (!bomb.active) {
             return;
         }
+        const body = bomb.body as Phaser.Physics.Arcade.Body;
+        const radius = Math.max(10, bomb.displayWidth * 0.5);
+        const minX = visibleLeftX + radius;
+        const maxX = visibleRightX - radius;
+
+        if (bomb.x < minX) {
+            bomb.x = minX;
+            body.velocity.x = Math.max(120, Math.abs(body.velocity.x));
+        } else if (bomb.x > maxX) {
+            bomb.x = maxX;
+            body.velocity.x = -Math.max(120, Math.abs(body.velocity.x));
+        }
         if (bomb.y < visibleTopY) {
             bomb.y = visibleTopY;
-            const body = bomb.body as Phaser.Physics.Arcade.Body;
             body.velocity.y = Math.max(120, Math.abs(body.velocity.y));
         }
     });

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import axios from "axios";
     import * as Phaser from "phaser";
     import { onDestroy, onMount } from "svelte";
     import { assertGameRuntimeConfig, getApiBaseUrl } from "../src/config/runtime";
@@ -25,8 +24,8 @@
         TOTAL_LEVELS,
         WORLD_GRAVITY_Y,
     } from "../src/game/constants";
-    import { ScoreSyncQueue, isRetryableScoreError, type ScorePayload } from "../src/game/scoreSync";
-    import { trackError, trackInfo } from "../src/game/telemetry";
+    import { ScoreSyncQueue, type ScorePayload } from "../src/game/scoreSync";
+    import { trackError } from "../src/game/telemetry";
     import { disposeAudio, playTone } from "../src/game/audio";
     import {
         enforceBombSafeZone,
@@ -40,12 +39,15 @@
     import { levelBanner, normalizePlayerSprite, resetStars as resetStarsForLevel } from "../src/game/levelVisuals";
     import { updatePlayerMotion } from "../src/game/playerMotion";
     import { preloadCoreAssets, selectPlayerSpriteSource } from "../src/game/preloadAssets";
+    import {
+        flushPendingScoresRuntime,
+        postScorePayload as postScorePayloadRuntime,
+        saveScoreRuntime,
+    } from "../src/game/scoreRuntime";
     import { setupGameScene } from "../src/game/sceneSetup";
     import { advanceAfterStarClear } from "../src/game/progressionRuntime";
     import {
-        buildScorePayload,
         createRunSessionState,
-        ensureTicketForSubmissionOrFail,
         handleRunTicketRequestError,
         markLevelReached,
         markRunStarted,
@@ -209,34 +211,17 @@
     }
 
     async function postScorePayload(payload: ScorePayload, timeoutMs: number) {
-        await axios.post(`${API_BASE_URL}/scores`, payload, { timeout: timeoutMs });
-    }
-
-    function readScoreSaveErrorMessage(error: unknown): string {
-        if (axios.isAxiosError(error)) {
-            const status = error.response?.status;
-            const serverMessage =
-                typeof error.response?.data?.error === "string" ? error.response.data.error.trim() : "";
-            if (serverMessage) {
-                return `Score rejected: ${serverMessage}`;
-            }
-            if (typeof status === "number" && status >= 400 && status < 500 && status !== 429) {
-                return "Score rejected by server validation.";
-            }
-        }
-        return "Score saved locally and will auto-sync when connection returns.";
+        await postScorePayloadRuntime(API_BASE_URL, payload, timeoutMs);
     }
 
     async function flushPendingScores() {
-        const pending = scoreQueue.getPendingCount();
-        if (pending === 0) {
-            refreshPendingSyncCount();
-            return;
-        }
-        trackInfo("pending_score_flush_started", { pending });
-        const remaining = await scoreQueue.flush(postScorePayload, SCORE_POST_TIMEOUT_MS, SCORE_RETRY_DELAYS_MS);
-        refreshPendingSyncCount();
-        trackInfo("pending_score_flush_completed", { remaining });
+        await flushPendingScoresRuntime({
+            scoreQueue,
+            postScore: postScorePayload,
+            timeoutMs: SCORE_POST_TIMEOUT_MS,
+            retryDelaysMs: SCORE_RETRY_DELAYS_MS,
+            refreshPendingSyncCount,
+        });
     }
 
     async function manualSyncNow() {
@@ -348,41 +333,24 @@
 
     async function saveScore() {
         const selectedNft = $player1nft ?? getPersistedNft(PLAYER_NFT_KEY);
-        submittingScore = true;
-        scoreSaveError = "";
-        if (runSession.runTicketSupportAvailable !== false && !runSession.runTicketId) {
-            await requestRunTicket();
-        }
-        if (!ensureTicketForSubmissionOrFail(runSession)) {
-            scoreSaveError = "Unable to verify run. Connect and retry.";
-            submittingScore = false;
-            return;
-        }
-        const payload: ScorePayload = buildScorePayload({
-            token: selectedNft?.tokenAddress ?? "",
-            imageURL: selectedNft?.imageURL ?? "",
+        await saveScoreRuntime({
+            scoreQueue,
+            runSession,
             score,
             playerName: $playerName ?? "anonymous",
-            session: runSession,
-            fallbackStartedAt: new Date(Date.now() - 20_000).toISOString(),
+            selectedNft,
+            timeoutMs: SCORE_POST_TIMEOUT_MS,
+            retryDelaysMs: SCORE_RETRY_DELAYS_MS,
+            requestRunTicket,
+            postScore: postScorePayload,
+            refreshPendingSyncCount,
+            setSubmittingScore: (value) => {
+                submittingScore = value;
+            },
+            setScoreSaveError: (value) => {
+                scoreSaveError = value;
+            },
         });
-        try {
-            await scoreQueue.postWithRetry(payload, postScorePayload, SCORE_POST_TIMEOUT_MS, SCORE_RETRY_DELAYS_MS);
-            refreshPendingSyncCount();
-            console.log("[GameDebug] score payload uses original NFT", {
-                token: payload.token,
-                imageURL: payload.imageURL,
-            });
-        } catch (error) {
-            if (isRetryableScoreError(error)) {
-                scoreQueue.enqueue(payload);
-                refreshPendingSyncCount();
-            }
-            scoreSaveError = readScoreSaveErrorMessage(error);
-            console.error("failed to save score", error);
-        } finally {
-            submittingScore = false;
-        }
     }
 
     async function hitBomb(this: Phaser.Scene, colliderPlayer: Phaser.GameObjects.GameObject) {
@@ -539,7 +507,9 @@
                 nearestBombDistance = distance;
             }
         });
-        keepBombsVisible(bombs, BOMB_VISIBLE_TOP_Y);
+        const viewLeftX = sceneRef?.cameras.main.worldView.left ?? 0;
+        const viewRightX = sceneRef?.cameras.main.worldView.right ?? GAME_WIDTH;
+        keepBombsVisible(bombs, BOMB_VISIBLE_TOP_Y, viewLeftX, viewRightX);
         if (
             !reducedMotion &&
             nearestBombDistance < CAMERA_NEAR_MISS_DISTANCE &&
@@ -579,6 +549,17 @@
         });
         jumpHoldTimeMs = motion.jumpHoldTimeMs;
         jumpPressedLastFrame = motion.jumpPressedLastFrame;
+
+        const halfWidth = Math.max(14, player.displayWidth * 0.5);
+        const minX = viewLeftX + halfWidth;
+        const maxX = viewRightX - halfWidth;
+        if (player.x < minX) {
+            player.x = minX;
+            player.setVelocityX(Math.max(0, player.body.velocity.x));
+        } else if (player.x > maxX) {
+            player.x = maxX;
+            player.setVelocityX(Math.min(0, player.body.velocity.x));
+        }
     }
 
     function retryRun() {

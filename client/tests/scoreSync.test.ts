@@ -86,3 +86,19 @@ test("postWithRetry does not retry non-retryable 4xx responses", async () => {
     assert.equal(attempts, 1);
     cleanup();
 });
+
+test("flush drops non-retryable 4xx payloads from queue", async () => {
+    const cleanup = mockWindowStorage();
+    const queue = new ScoreSyncQueue("test.pending", "test.lastSync");
+    queue.enqueue(payload);
+    const remaining = await queue.flush(
+        async () => {
+            throw { response: { status: 400 } };
+        },
+        1000,
+        [1, 1],
+    );
+    assert.equal(remaining, 0);
+    assert.equal(queue.getPendingCount(), 0);
+    cleanup();
+});
