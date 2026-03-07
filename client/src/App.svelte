@@ -175,11 +175,11 @@
     .game-shell .game-content {
       position: fixed;
       top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100dvh;
+      left: 100vw;
+      width: 100dvh;
+      height: 100vw;
       transform-origin: top left;
-      transform: rotate(90deg) translateY(-100vw);
+      transform: rotate(90deg);
       overflow: hidden;
       padding: 0;
     }

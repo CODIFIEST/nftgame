@@ -1809,7 +1809,7 @@
         position: absolute;
         left: 0;
         right: 0;
-        bottom: 16px;
+        bottom: max(16px, env(safe-area-inset-bottom));
         display: none;
         justify-content: center;
         gap: 14px;
@@ -1852,6 +1852,12 @@
             font-size: 17px;
         }
 
+        .mobile-controls {
+            display: flex;
+        }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
         .mobile-controls {
             display: flex;
         }
