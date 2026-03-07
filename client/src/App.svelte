@@ -19,6 +19,7 @@
     let backgroundAudio: HTMLAudioElement | null = null;
     let resumeAudioOnGesture: (() => void) | null = null;
     let isMuted = false;
+    let isPhantomBrowser = false;
 
     function toggleDisplay() {
         viewForm = !viewForm;
@@ -64,6 +65,8 @@
   }
 
   onMount(() => {
+    isPhantomBrowser = /phantom/i.test(navigator.userAgent);
+
     const trackUrl = encodeURI("/audio/colder still OST thingie 2-23-2026.mp3");
     backgroundAudio = new Audio(trackUrl);
     backgroundAudio.loop = true;
@@ -122,7 +125,7 @@
   }
 </script>
 
-<main>
+<main class:phantom-browser={isPhantomBrowser}>
   <button class="audio-toggle" on:click={toggleMute}>
     {isMuted ? "Unmute" : "Mute"}
   </button>
@@ -145,14 +148,22 @@
 
 <style>
   .game-shell {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
     background: radial-gradient(circle at 20% 20%, #1b2945 0%, #0e182d 45%, #070d18 100%);
+    overflow: hidden;
   }
 
   .game-content {
     width: 100%;
+    height: 100%;
     display: flex;
     justify-content: center;
-    padding: 12px;
+    align-items: stretch;
+    padding: 0;
   }
 
   .audio-toggle {
@@ -171,22 +182,8 @@
     backdrop-filter: blur(4px);
   }
 
-  @media (orientation: portrait) and (max-width: 1024px) {
-    .game-shell .game-content {
-      position: fixed;
-      top: 0;
-      left: 100vw;
-      width: 100dvh;
-      height: 100vw;
-      transform-origin: top left;
-      transform: rotate(90deg);
-      overflow: hidden;
-      padding: 0;
-    }
-
-    .game-shell .game-content > .w-full {
-      width: 100%;
-      height: 100%;
-    }
+  .game-shell .game-content > .w-full {
+    width: 100%;
+    height: 100%;
   }
 </style>

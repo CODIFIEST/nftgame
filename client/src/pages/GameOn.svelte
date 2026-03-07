@@ -9,8 +9,9 @@
 <style>
     .game-stage {
         width: 100%;
-        display: flex;
-        justify-content: center;
-        padding: 12px 0;
+        height: 100%;
+        min-height: 100dvh;
+        display: block;
+        padding: 0;
     }
 </style>
