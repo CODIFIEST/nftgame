@@ -5,7 +5,6 @@
     import { assertGameRuntimeConfig, getApiBaseUrl } from "../src/config/runtime";
     import {
         BACKGROUND_SCALE,
-        BACKGROUND_SECTION_GRID,
         BASE_CAMERA_ZOOM,
         BOMB_VISIBLE_TOP_Y,
         CAMERA_NEAR_MISS_COOLDOWN_MS,
@@ -17,7 +16,6 @@
         JUMP_HOLD_MAX_MS,
         JUMP_INITIAL_VELOCITY,
         JUMP_RELEASE_CUTOFF,
-        PLAYER_BOMB_SAFE_DISTANCE,
         PLAYER_IMAGE_KEY,
         PLAYER_MOVE_SPEED,
         PLAYER_NAME_KEY,
@@ -31,13 +29,35 @@
     import { trackError, trackInfo } from "../src/game/telemetry";
     import { disposeAudio, playTone } from "../src/game/audio";
     import {
+        enforceBombSafeZone,
+        keepBombsVisible,
+        syncBombCount as syncBombCountForLevel,
+    } from "../src/game/bombs";
+    import { applyBackgroundSection } from "../src/game/background";
+    import { runSanityChecks } from "../src/game/debug";
+    import { applyLevelTheme as applyLevelThemeRuntime, type LevelThemeOptions } from "../src/game/levelTheme";
+    import { levelBanner, normalizePlayerSprite, resetStars as resetStarsForLevel } from "../src/game/levelVisuals";
+    import { nextComboMultiplier, pointsForCombo, renderStarCollectFx } from "../src/game/starCollect";
+    import {
         anchorXForLevel,
-        buildLayoutFromAnchor,
         buildLevels,
         clamp,
         type LevelConfig,
-        type PlatformConfig,
     } from "../src/game/levels";
+    import {
+        animatePlatformsToLayout,
+        buildPlatforms,
+        buildPlatformsSequential,
+        getCurrentAnchorLedge,
+        getCurrentAnchorPlatform,
+        placePlayerAtLevelStart,
+        sequentialRevealDurationMs,
+    } from "../src/game/platformRuntime";
+    import {
+        centerZoomedCamera,
+        verifyAllLevelFirstLedgeReachability,
+    } from "../src/game/sceneMath";
+    import { loadGameplayPreferences, persistGameplayPreferences } from "../src/game/preferences";
     import { dataUrlToObjectUrl, getPersistedNft, hydratePersistedPlayerState } from "../src/game/playerSession";
     import highscores from "../src/stores/highscores";
     import player1nft from "../src/stores/player1nft";
@@ -47,21 +67,6 @@
     import RunStartOverlay from "./RunStartOverlay.svelte";
     import PauseOverlay from "./PauseOverlay.svelte";
     import GameOptionsPanel from "./GameOptionsPanel.svelte";
-
-    type BombStyle = {
-        tint: number;
-        scale: number;
-    };
-
-    type LevelThemeOptions = {
-        preservePlayer?: boolean;
-        anchor?: { x: number; y: number };
-        skipBackgroundPan?: boolean;
-        platformTransitionMs?: number;
-        playerTransitionMs?: number;
-        sequentialReveal?: boolean;
-    };
-
 
     const LEVELS: LevelConfig[] = buildLevels(TOTAL_LEVELS, GAME_WIDTH);
     const API_BASE_URL = getApiBaseUrl();
@@ -123,25 +128,13 @@
     let leftHandedMobileControls = false;
     let onWindowKeydown: ((event: KeyboardEvent) => void) | undefined;
 
-    const REDUCED_MOTION_KEY = "nftgame.reducedMotion";
-    const LEFT_HANDED_KEY = "nftgame.leftHandedControls";
-
     $: highScoreValue = $highscores?.[0]?.score ?? 0;
     $: if (typeof window !== "undefined") {
-        localStorage.setItem(REDUCED_MOTION_KEY, reducedMotion ? "1" : "0");
-        localStorage.setItem(LEFT_HANDED_KEY, leftHandedMobileControls ? "1" : "0");
+        persistGameplayPreferences({ reducedMotion, leftHandedMobileControls });
     }
 
     function activeLevelConfig(): LevelConfig {
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
-    }
-
-    function loadGameplayPreferences() {
-        if (typeof window === "undefined") {
-            return;
-        }
-        reducedMotion = localStorage.getItem(REDUCED_MOTION_KEY) === "1";
-        leftHandedMobileControls = localStorage.getItem(LEFT_HANDED_KEY) === "1";
     }
 
     function beginRun() {
@@ -165,72 +158,6 @@
         } else {
             sceneRef.physics.resume();
         }
-    }
-
-    function estimateMaxJumpRisePx(): number {
-        const dt = 1 / 120;
-        let vy = JUMP_INITIAL_VELOCITY;
-        let y = 0;
-        let maxRise = 0;
-        let holdTime = 0;
-
-        for (let i = 0; i < 600; i += 1) {
-            if (vy < 0 && holdTime < JUMP_HOLD_MAX_MS) {
-                vy += JUMP_HOLD_ACCEL * dt;
-                holdTime += dt * 1000;
-            }
-
-            vy += WORLD_GRAVITY_Y * dt;
-            y += vy * dt;
-            maxRise = Math.max(maxRise, -y);
-            if (vy > 0 && y >= 0) {
-                break;
-            }
-        }
-
-        return maxRise;
-    }
-
-    function verifyAllLevelFirstLedgeReachability(scene: Phaser.Scene) {
-        const groundTexture = scene.textures.get("ground").getSourceImage() as { height?: number };
-        const groundHeight = groundTexture?.height ?? 64;
-        const groundTop = 1050 - groundHeight / 2;
-        const maxJumpRise = estimateMaxJumpRisePx();
-        const safetyMargin = 12;
-
-        LEVELS.forEach((cfg, idx) => {
-            const lowestLedgeY = Math.max(...cfg.platformLayout.map((piece) => piece.y));
-            const lowestLedgeTop = lowestLedgeY - groundHeight / 2;
-            const riseRequired = groundTop - lowestLedgeTop;
-            const reachable = riseRequired <= maxJumpRise - safetyMargin;
-            const payload = {
-                level: idx + 1,
-                title: cfg.title,
-                riseRequired: Math.round(riseRequired),
-                maxJumpRise: Math.round(maxJumpRise),
-                reachable,
-            };
-            if (!reachable) {
-                console.error("[GameDebug] first ledge unreachable with current jump model", payload);
-            } else {
-                console.log("[GameDebug] first ledge reachable", payload);
-            }
-        });
-    }
-
-    function runSanityChecks() {
-        console.group("[GameDebug] Sanity checks");
-        console.assert(Array.isArray(LEVELS) && LEVELS.length > 0, "LEVELS config missing");
-        console.assert(Boolean(document.getElementById(GAME_CONTAINER_ID)), "Game container is missing");
-        console.assert(GAME_WIDTH > 0 && GAME_HEIGHT > 0, "Invalid game dimensions");
-        console.log("Store snapshot", {
-            playerName: $playerName,
-            hasPlayerImage: Boolean($playerImage),
-            hasSelectedNft: Boolean($player1nft),
-            highScoresLoaded: Array.isArray($highscores),
-            highScoreValue,
-        });
-        console.groupEnd();
     }
 
     function refreshPendingSyncCount() {
@@ -281,426 +208,25 @@
         isLevelTransitioning = false;
     }
 
-    function buildPlatforms(scene: Phaser.Scene, layout: PlatformConfig[]) {
-        console.log("[GameDebug] buildPlatforms", { count: layout.length, level });
-        if (!platforms) {
-            platforms = scene.physics.add.staticGroup();
-        } else {
-            platforms.clear(true, true);
-        }
-        platforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, "ground").setScale(4, 1).refreshBody();
-
-        layout.forEach((piece) => {
-            const platform = platforms.create(piece.x, piece.y, "ground");
-            if (piece.scaleX) {
-                platform.setScale(piece.scaleX, 1).refreshBody();
-            }
-        });
-    }
-
-    function platformTargetsForLayout(layout: PlatformConfig[]): PlatformConfig[] {
-        return [{ x: GAME_WIDTH / 2, y: GAME_HEIGHT - 10, scaleX: 4 }, ...layout];
-    }
-
-    function animatePlatformsToLayout(scene: Phaser.Scene, layout: PlatformConfig[], durationMs: number) {
-        if (!platforms) {
-            buildPlatforms(scene, layout);
-            return;
-        }
-        const targets = platformTargetsForLayout(layout);
-        const current = platforms.getChildren() as Phaser.Physics.Arcade.Image[];
-
-        while (current.length < targets.length) {
-            const target = targets[current.length];
-            const created = platforms.create(target.x, target.y, "ground") as Phaser.Physics.Arcade.Image;
-            created.setScale(target.scaleX ?? 1, 1).refreshBody();
-            current.push(created);
-        }
-        while (current.length > targets.length) {
-            const stale = current.pop();
-            stale?.destroy();
-        }
-
-        current.forEach((platform, index) => {
-            const target = targets[index];
-            scene.tweens.add({
-                targets: platform,
-                x: target.x,
-                y: target.y,
-                scaleX: target.scaleX ?? 1,
-                scaleY: 1,
-                duration: durationMs,
-                ease: "Sine.easeInOut",
-                onUpdate: () => {
-                    platform.refreshBody();
-                },
-                onComplete: () => {
-                    platform.refreshBody();
-                },
-            });
-        });
-    }
-
-    function sequentialRevealDurationMs(layoutLength: number): number {
-        const intervalMs = 240;
-        return Math.max(460, (layoutLength - 1) * intervalMs + 420);
-    }
-
-    function buildPlatformsSequential(
-        scene: Phaser.Scene,
-        layout: PlatformConfig[],
-        preservePlayerOnAnchor: boolean,
-    ): number {
-        if (!platforms) {
-            platforms = scene.physics.add.staticGroup();
-        } else {
-            platforms.clear(true, true);
-        }
-
-        const anchor = layout[0];
-        const ground = platforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, "ground");
-        ground.setScale(4, 1).refreshBody();
-        const anchorPlatform = platforms.create(anchor.x, anchor.y, "ground");
-        anchorPlatform.setScale(anchor.scaleX ?? 0.72, 1).refreshBody();
-
-        if (preservePlayerOnAnchor && player) {
-            player.x = anchor.x;
-            player.y = anchor.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
-            player.setVelocity(0, 0);
-        }
-
-        const remaining = layout
-            .slice(1)
-            .sort((a, b) => {
-                const da = Math.abs(a.x - anchor.x) + Math.abs(a.y - anchor.y);
-                const db = Math.abs(b.x - anchor.x) + Math.abs(b.y - anchor.y);
-                return da - db;
-            });
-
-        const intervalMs = 240;
-        remaining.forEach((piece, idx) => {
-            scene.time.delayedCall((idx + 1) * intervalMs, () => {
-                const platform = platforms.create(piece.x, piece.y + 18, "ground");
-                platform.setScale(piece.scaleX ?? 1, 1).setAlpha(0).refreshBody();
-                scene.tweens.add({
-                    targets: platform,
-                    y: piece.y,
-                    alpha: 1,
-                    duration: 360,
-                    ease: "Sine.easeOut",
-                    onUpdate: () => platform.refreshBody(),
-                    onComplete: () => platform.refreshBody(),
-                });
-            });
-        });
-
-        return sequentialRevealDurationMs(layout.length);
-    }
-
-    function placePlayerAtLevelStart() {
-        if (!player) {
-            return;
-        }
-        const layout = activeLevelConfig().platformLayout;
-        const startLedge = layout[0];
-        const spawnX = startLedge.x;
-        const spawnY = startLedge.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
-        const body = player.body as Phaser.Physics.Arcade.Body;
-        body.reset(spawnX, spawnY);
-        player.clearTint();
-        player.setVelocity(0, 0);
-        console.log("[GameDebug] repositioned player for new level", {
-            level,
-            spawnX,
-            spawnY,
-            startLedgeY: startLedge.y,
-        });
-    }
-
-    function getCurrentAnchorLedge(): { x: number; y: number } {
-        if (!player || !platforms) {
-            return { x: 180, y: 850 };
-        }
-        const candidates = platforms.getChildren() as Phaser.Physics.Arcade.Image[];
-        const playerFootY = player.y + player.displayHeight * 0.45;
-        let best = candidates[0];
-        let bestScore = Number.POSITIVE_INFINITY;
-        candidates.forEach((platform) => {
-            const dx = Math.abs(platform.x - player.x);
-            const dy = Math.abs(platform.y - playerFootY);
-            const score = dx + dy * 1.2;
-            if (score < bestScore) {
-                best = platform;
-                bestScore = score;
-            }
-        });
-        return { x: best?.x ?? player.x, y: best?.y ?? player.y + 90 };
-    }
-
-    function getCurrentAnchorPlatform(): Phaser.Physics.Arcade.Image | null {
-        if (!player || !platforms) {
-            return null;
-        }
-        const candidates = platforms.getChildren() as Phaser.Physics.Arcade.Image[];
-        const playerFootY = player.y + player.displayHeight * 0.45;
-        const onTopCandidates = candidates.filter((platform) => {
-            const dx = Math.abs(platform.x - player.x);
-            const dy = Math.abs(platform.y - playerFootY);
-            const halfWidth = (platform.displayWidth || 120) / 2;
-            return dx <= halfWidth + 24 && dy <= 84;
-        });
-        const pool = onTopCandidates.length > 0 ? onTopCandidates : candidates;
-
-        let best: Phaser.Physics.Arcade.Image | null = null;
-        let bestScore = Number.POSITIVE_INFINITY;
-        pool.forEach((platform) => {
-            const dx = Math.abs(platform.x - player.x);
-            const dy = Math.abs(platform.y - playerFootY);
-            const score = dy * 1.6 + dx;
-            if (score < bestScore) {
-                best = platform;
-                bestScore = score;
-            }
-        });
-        return best;
-    }
-
-    function centerZoomedCamera(scene: Phaser.Scene) {
-        const camera = scene.cameras.main;
-        const visibleWidth = GAME_WIDTH / camera.zoom;
-        const visibleHeight = GAME_HEIGHT / camera.zoom;
-        camera.setScroll((GAME_WIDTH - visibleWidth) / 2, (GAME_HEIGHT - visibleHeight) / 2);
-    }
-
-    function backgroundTargetPositionForLevel(levelNumber: number) {
-        const sectionIndex = (levelNumber - 1) % (BACKGROUND_SECTION_GRID * BACKGROUND_SECTION_GRID);
-        const rowFromBottom = Math.floor(sectionIndex / BACKGROUND_SECTION_GRID);
-        const indexInRow = sectionIndex % BACKGROUND_SECTION_GRID;
-        const col = rowFromBottom % 2 === 0 ? indexInRow : BACKGROUND_SECTION_GRID - 1 - indexInRow;
-        const u = (col + 0.5) / BACKGROUND_SECTION_GRID;
-        const v = 1 - (rowFromBottom + 0.5) / BACKGROUND_SECTION_GRID;
-        const displayWidth = GAME_WIDTH * BACKGROUND_SCALE;
-        const displayHeight = GAME_HEIGHT * BACKGROUND_SCALE;
-        return {
-            x: GAME_WIDTH / 2 + displayWidth * (0.5 - u),
-            y: GAME_HEIGHT / 2 + displayHeight * (0.5 - v),
-            sectionIndex: sectionIndex + 1,
-        };
-    }
-
-    function applyBackgroundSection(scene: Phaser.Scene, levelNumber: number, animate: boolean) {
-        if (!background) {
-            return;
-        }
-        const target = backgroundTargetPositionForLevel(levelNumber);
-        if (!animate) {
-            background.setPosition(target.x, target.y);
-            console.log("[GameDebug] background section set", { level: levelNumber, section: target.sectionIndex });
-            return;
-        }
-
-        scene.tweens.add({
-            targets: background,
-            x: target.x,
-            y: target.y,
-            duration: 2700,
-            ease: "Sine.easeInOut",
-        });
-        console.log("[GameDebug] background section tween", { level: levelNumber, section: target.sectionIndex });
-    }
-
-    function normalizePlayerSprite(scene: Phaser.Scene) {
-        const dudeTexture = scene.textures.get("dude");
-        const source = dudeTexture.getSourceImage() as { width?: number; height?: number };
-        const sourceWidth = source?.width ?? 96;
-        const sourceHeight = source?.height ?? 96;
-        const maxWidth = 96;
-        const maxHeight = 112;
-        const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
-        const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-
-        player.setScale(safeScale);
-        const body = player.body as Phaser.Physics.Arcade.Body;
-        body.setSize(
-            Math.max(36, Math.floor(sourceWidth * 0.45)),
-            Math.max(62, Math.floor(sourceHeight * 0.9)),
-            true,
-        );
-        console.log("[GameDebug] normalized player sprite", {
-            sourceWidth,
-            sourceHeight,
-            displayWidth: player.displayWidth,
-            displayHeight: player.displayHeight,
-            bodyWidth: body.width,
-            bodyHeight: body.height,
-        });
-    }
-
-    function spawnBomb(speedBase: number) {
-        let x = Phaser.Math.Between(50, GAME_WIDTH - 50);
-        if (player) {
-            for (let attempt = 0; attempt < 8; attempt += 1) {
-                const candidate = Phaser.Math.Between(50, GAME_WIDTH - 50);
-                if (Math.abs(candidate - player.x) >= PLAYER_BOMB_SAFE_DISTANCE) {
-                    x = candidate;
-                    break;
-                }
-            }
-        }
-        const bomb = bombs.create(x, 16, "bomb");
-        bomb.setBounce(1);
-        bomb.setCollideWorldBounds(true);
-        applyBombStyle(bomb as Phaser.Physics.Arcade.Image);
-        bomb.setVelocity(
-            Phaser.Math.Between(-speedBase, speedBase),
-            Phaser.Math.Between(80, 160),
-        );
-    }
-
-    function bombStyleForLevel(currentLevel: number): BombStyle {
-        const tier = Math.min(4, Math.floor((currentLevel - 1) / 20));
-        const styles: BombStyle[] = [
-            { tint: 0xffffff, scale: 1 },
-            { tint: 0xffe29b, scale: 1.04 },
-            { tint: 0xffb59b, scale: 1.08 },
-            { tint: 0xff9bcf, scale: 1.12 },
-            { tint: 0xff8f8f, scale: 1.16 },
-        ];
-        return styles[tier];
-    }
-
-    function applyBombStyle(bomb: Phaser.Physics.Arcade.Image) {
-        const style = bombStyleForLevel(level);
-        bomb.setTint(style.tint);
-        bomb.setScale(style.scale);
-        bomb.setAlpha(0.96);
-    }
-
-    function enforceBombSafeZone(speedBase: number) {
-        if (!player) {
-            return;
-        }
-        bombs.children.each((child) => {
-            const bomb = child as Phaser.Physics.Arcade.Image;
-            if (!bomb.active) {
-                return;
-            }
-            const dx = Math.abs(bomb.x - player.x);
-            const dy = Math.abs(bomb.y - player.y);
-            const tooClose = dx < PLAYER_BOMB_SAFE_DISTANCE && dy < 220;
-            if (!tooClose) {
-                return;
-            }
-
-            let nextX = bomb.x;
-            for (let attempt = 0; attempt < 10; attempt += 1) {
-                const candidate = Phaser.Math.Between(50, GAME_WIDTH - 50);
-                if (Math.abs(candidate - player.x) >= PLAYER_BOMB_SAFE_DISTANCE) {
-                    nextX = candidate;
-                    break;
-                }
-            }
-            bomb.setPosition(nextX, 16);
-            bomb.setVelocity(
-                Phaser.Math.Between(-speedBase, speedBase),
-                Phaser.Math.Between(80, 160),
-            );
-        });
-    }
-
     function syncBombCount() {
         const target = activeLevelConfig().targetBombs;
         const currentCount = bombs.countActive(true);
         const missing = Math.max(0, target - currentCount);
         console.log("[GameDebug] syncBombCount", { target, currentCount, missing, level });
-        for (let i = 0; i < missing; i += 1) {
-            spawnBomb(activeLevelConfig().bombSpeed);
-        }
-        bombs.children.each((child) => {
-            const bomb = child as Phaser.Physics.Arcade.Image;
-            if (bomb?.active) {
-                applyBombStyle(bomb);
-            }
-        });
+        syncBombCountForLevel(bombs, player, level, target, activeLevelConfig().bombSpeed);
     }
 
-    function keepBombsVisible() {
-        bombs?.children.each((child) => {
-            const bomb = child as Phaser.Physics.Arcade.Image;
-            if (!bomb?.active) {
-                return;
-            }
-            if (bomb.y < BOMB_VISIBLE_TOP_Y) {
-                bomb.y = BOMB_VISIBLE_TOP_Y;
-                const body = bomb.body as Phaser.Physics.Arcade.Body;
-                body.velocity.y = Math.max(120, Math.abs(body.velocity.y));
-            }
-        });
-    }
-
-    function resetStars() {
+    function resetStars(activePlatforms: Phaser.Physics.Arcade.StaticGroup = platforms) {
         console.log("[GameDebug] resetStars", { level, total: activeLevelConfig().starCount });
-        if (!stars) {
-            stars = sceneRef!.physics.add.group();
-            sceneRef!.physics.add.collider(stars, platforms);
-            sceneRef!.physics.add.overlap(player, stars, collectStar, undefined, sceneRef!);
-        } else {
-            stars.clear(true, true);
-        }
-
-        const totalStars = activeLevelConfig().starCount;
-        const layout = activeLevelConfig().platformLayout;
-        for (let i = 0; i < totalStars; i += 1) {
-            const platform = layout[i % layout.length];
-            const platformRow = Math.floor(i / layout.length);
-            const estimatedPlatformWidth = 128 * (platform.scaleX ?? 1);
-            const xJitter = Math.max(8, Math.min(26, estimatedPlatformWidth * 0.22));
-            const x = clamp(platform.x + Phaser.Math.Between(-xJitter, xJitter), 40, GAME_WIDTH - 40);
-            const y = clamp(platform.y - 170 - platformRow * 34, 25, GAME_HEIGHT - 130);
-            const star = stars.create(x, y, "star") as Phaser.Physics.Arcade.Image;
-            star.setBounceY(Phaser.Math.FloatBetween(0.05, 0.16));
-            star.setCollideWorldBounds(true);
-        }
-
-        stars.children.iterate((child) => {
-            const eachStar = child as Phaser.Physics.Arcade.Image;
-            eachStar.setBounceY(Phaser.Math.FloatBetween(0.2, 0.8));
-        });
-    }
-
-    function levelBanner(scene: Phaser.Scene, text: string) {
-        const flash = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0.22);
-        flash.setBlendMode(Phaser.BlendModes.ADD);
-        scene.tweens.add({
-            targets: flash,
-            alpha: 0,
-            duration: 320,
-            ease: "Cubic.easeOut",
-            onComplete: () => flash.destroy(),
-        });
-
-        const banner = scene.add.text(GAME_WIDTH / 2, 170, text, {
-            fontFamily: "Georgia, serif",
-            fontSize: "42px",
-            color: "#ffffff",
-            stroke: "#1a2538",
-            strokeThickness: 8,
-        });
-        banner.setOrigin(0.5);
-        scene.tweens.add({
-            targets: banner,
-            scale: { from: 0.84, to: 1.08 },
-            yoyo: true,
-            repeat: 1,
-            duration: 280,
-            ease: "Back.easeOut",
-        });
-        scene.tweens.add({
-            targets: banner,
-            alpha: { from: 1, to: 0 },
-            y: 140,
-            duration: 1200,
-            onComplete: () => banner.destroy(),
+        stars = resetStarsForLevel({
+            scene: sceneRef!,
+            stars,
+            platforms: activePlatforms,
+            player,
+            collectStar,
+            layout: activeLevelConfig().platformLayout,
+            totalStars: activeLevelConfig().starCount,
+            clamp,
         });
     }
 
@@ -742,73 +268,42 @@
     }
 
     function applyLevelTheme(scene: Phaser.Scene, showBanner = false, options: LevelThemeOptions = {}) {
-        const config = activeLevelConfig();
-        console.log("[GameDebug] applyLevelTheme", { level, title: config.title, showBanner });
-        if (options.anchor) {
-            config.platformLayout = buildLayoutFromAnchor(level, options.anchor.x, options.anchor.y, GAME_WIDTH);
-        }
-        levelThemeName = config.title;
-        if (background) {
-            background.clearTint();
-        }
-        if (glowOverlay) {
-            glowOverlay.setFillStyle(config.tint, 0.05);
-        }
-        if (!options.skipBackgroundPan) {
-            applyBackgroundSection(scene, level, showBanner && level > 1);
-        }
-        scene.cameras.main.setZoom(BASE_CAMERA_ZOOM);
-        centerZoomedCamera(scene);
-
-        const finalizeSpawns = () => {
-            resetStars();
-            syncBombCount();
-            enforceBombSafeZone(config.bombSpeed);
-        };
-
-        if (options.sequentialReveal) {
-            const revealMs = buildPlatformsSequential(scene, config.platformLayout, Boolean(options.preservePlayer));
-            scene.time.delayedCall(revealMs, finalizeSpawns);
-        } else if (options.platformTransitionMs && options.platformTransitionMs > 0) {
-            animatePlatformsToLayout(scene, config.platformLayout, options.platformTransitionMs);
-            resetStars();
-            if (!options.preservePlayer) {
-                placePlayerAtLevelStart();
-            } else if (options.playerTransitionMs && options.playerTransitionMs > 0 && player) {
-                const startLedge = config.platformLayout[0];
-                const targetY = startLedge.y - Math.max(120, Math.floor(player.displayHeight * 0.85));
-                scene.tweens.add({
-                    targets: player,
-                    x: startLedge.x,
-                    y: targetY,
-                    duration: options.playerTransitionMs,
-                    ease: "Sine.easeInOut",
-                });
-            }
-            syncBombCount();
-            enforceBombSafeZone(config.bombSpeed);
-        } else {
-            buildPlatforms(scene, config.platformLayout);
-            resetStars();
-            if (!options.preservePlayer) {
-                placePlayerAtLevelStart();
-            }
-            syncBombCount();
-            enforceBombSafeZone(config.bombSpeed);
-        }
-        uiLevel = level;
-        comboMultiplier = 1;
-        uiCombo = 1;
-        triggerHudPulse("level");
-        playTone(480 + level * 30, 120, 0.025, "triangle");
-        playTone(610 + level * 30, 150, 0.02, "triangle");
-        if (!reducedMotion) {
-            scene.cameras.main.flash(220, 255, 255, 255, false);
-        }
-
-        if (showBanner) {
-            levelBanner(scene, `Level ${level}: ${config.title}`);
-        }
+        platforms = applyLevelThemeRuntime({
+            scene,
+            level,
+            levels: LEVELS,
+            gameWidth: GAME_WIDTH,
+            showBanner,
+            options,
+            background,
+            glowOverlay,
+            baseCameraZoom: BASE_CAMERA_ZOOM,
+            reducedMotion,
+            platforms,
+            player,
+            setLevelThemeName: (value) => {
+                levelThemeName = value;
+            },
+            setUiLevel: (value) => {
+                uiLevel = value;
+            },
+            onLevelActivated: () => {
+                comboMultiplier = 1;
+                uiCombo = 1;
+                triggerHudPulse("level");
+            },
+            centerZoomedCamera,
+            applyBackgroundSection,
+            buildPlatforms,
+            animatePlatformsToLayout,
+            buildPlatformsSequential,
+            placePlayerAtLevelStart,
+            resetStars,
+            syncBombCount,
+            enforceBombSafeZone: (bombSpeed) => enforceBombSafeZone(bombs, player, bombSpeed),
+            playTone,
+            levelBanner,
+        });
     }
 
     async function saveScore() {
@@ -885,10 +380,10 @@
         star.disableBody(true, true);
 
         const now = this.time.now;
-        comboMultiplier = now - lastCollectAt <= 1400 ? Math.min(6, comboMultiplier + 1) : 1;
+        comboMultiplier = nextComboMultiplier(now, lastCollectAt, comboMultiplier);
         lastCollectAt = now;
 
-        const points = 10 * comboMultiplier;
+        const points = pointsForCombo(comboMultiplier);
         score += points;
         uiScore = score;
         uiCombo = comboMultiplier;
@@ -896,34 +391,7 @@
         triggerHudPulse("combo");
         console.log("[GameDebug] collectStar", { score, comboMultiplier, points, level });
         playTone(460 + comboMultiplier * 45, 90, 0.025, "square");
-
-        const plusText = this.add.text(star.x, star.y - 20, `+${points}`, {
-            fontFamily: "Verdana, sans-serif",
-            fontSize: "24px",
-            color: "#ffe780",
-            stroke: "#413100",
-            strokeThickness: 4,
-        });
-        plusText.setOrigin(0.5);
-        this.tweens.add({
-            targets: plusText,
-            y: star.y - 60,
-            alpha: 0,
-            duration: 500,
-            onComplete: () => plusText.destroy(),
-        });
-
-        const particles = this.add.particles("star");
-        particles.createEmitter({
-            x: star.x,
-            y: star.y,
-            speed: { min: 45, max: 140 },
-            scale: { start: 0.15, end: 0 },
-            lifespan: 400,
-            quantity: 8,
-            gravityY: 230,
-        });
-        this.time.delayedCall(450, () => particles.destroy());
+        renderStarCollectFx(this, star, points);
 
         if (stars.countActive(true) === 0) {
             if (level < LEVELS.length) {
@@ -932,8 +400,8 @@
                 }
                 isLevelTransitioning = true;
                 player.setVelocity(0, 0);
-                const anchor = getCurrentAnchorLedge();
-                const anchorPlatform = getCurrentAnchorPlatform();
+                const anchor = getCurrentAnchorLedge(player, platforms);
+                const anchorPlatform = getCurrentAnchorPlatform(player, platforms);
                 const nextLevel = level + 1;
                 const desiredAnchorX = anchorXForLevel(nextLevel, GAME_WIDTH);
                 const transitionDuration = 2700;
@@ -957,7 +425,7 @@
                 playTone(780, 120, 0.03, "triangle");
                 playTone(920, 120, 0.024, "triangle");
                 this.physics.pause();
-                applyBackgroundSection(this, nextLevel, true);
+                applyBackgroundSection(this, background, nextLevel, true);
                 this.tweens.addCounter({
                     from: 0,
                     to: 1,
@@ -1038,7 +506,7 @@
         centerZoomedCamera(this);
         background = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, "sky");
         background.setDisplaySize(GAME_WIDTH * BACKGROUND_SCALE, GAME_HEIGHT * BACKGROUND_SCALE);
-        applyBackgroundSection(this, 1, false);
+        applyBackgroundSection(this, background, 1, false);
         glowOverlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x9bd5ff, 0.05);
         glowOverlay.setBlendMode(Phaser.BlendModes.SCREEN);
         ambienceParticles = this.add.particles("star");
@@ -1056,7 +524,7 @@
         });
 
         player = this.physics.add.sprite(100, 450, "dude");
-        normalizePlayerSprite(this);
+        normalizePlayerSprite(player, this);
         player.setBounce(0.2);
         player.setCollideWorldBounds(true);
 
@@ -1065,7 +533,7 @@
 
         cursors = this.input.keyboard.createCursorKeys();
         applyLevelTheme(this, true);
-        verifyAllLevelFirstLedgeReachability(this);
+        verifyAllLevelFirstLedgeReachability(this, LEVELS);
         this.physics.add.collider(player, platforms);
         this.physics.add.collider(bombs, platforms);
         if (!hasRunStarted) {
@@ -1091,7 +559,7 @@
                 nearestBombDistance = distance;
             }
         });
-        keepBombsVisible();
+        keepBombsVisible(bombs, BOMB_VISIBLE_TOP_Y);
         if (
             !reducedMotion &&
             nearestBombDistance < CAMERA_NEAR_MISS_DISTANCE &&
@@ -1110,7 +578,7 @@
 
         if (player.y > GAME_HEIGHT + 120) {
             console.warn("[GameDebug] player fell below world, resetting position", { level });
-            placePlayerAtLevelStart();
+            placePlayerAtLevelStart(player, activeLevelConfig().platformLayout, level);
             return;
         }
 
@@ -1191,9 +659,17 @@
             setPlayerImage: (value) => playerImage.set(value),
             setPlayerNft: (value) => player1nft.set(value as any),
         });
-        loadGameplayPreferences();
+        const prefs = loadGameplayPreferences();
+        reducedMotion = prefs.reducedMotion;
+        leftHandedMobileControls = prefs.leftHandedMobileControls;
         resetSessionState();
-        runSanityChecks();
+        runSanityChecks(LEVELS, {
+            playerName: $playerName,
+            hasPlayerImage: Boolean($playerImage),
+            hasSelectedNft: Boolean($player1nft),
+            highScoresLoaded: Array.isArray($highscores),
+            highScoreValue,
+        });
         refreshPendingSyncCount();
         void flushPendingScores();
 

@@ -67,11 +67,4 @@
     .the-NFT {
         margin: 0 auto;
     }
-    h2 {
-        text-align: center;
-        /* 
-    font-size: 16px;
-    font-weight: 500; */
-        color: #b4bbc3;
-    }
 </style>

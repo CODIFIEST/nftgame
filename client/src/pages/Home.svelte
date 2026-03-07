@@ -3,7 +3,7 @@
     import HighScoreList from "../../components/HighScoreList.svelte";
     import player1 from "../stores/player1";
     import playerName from "../stores/playername";
-    import { push } from "svelte-spa-router/Router.svelte";
+    import { push } from "svelte-spa-router";
     const PLAYER_NAME_KEY = "nftgame.playerName";
 
     function setPlayerName() {

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
-    import Router from 'svelte-spa-router/Router.svelte'
+    import Router from "svelte-spa-router";
     import { wrap } from "svelte-spa-router/wrap";
     import { location } from "svelte-spa-router";
     import DisplayNfTs from "./pages/DisplayNFTs.svelte";

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import type { NFT } from "../../../server/domain/nft";
     import nfts from "../stores/nfts";
     import Nft from "../../components/NFT.svelte";
  

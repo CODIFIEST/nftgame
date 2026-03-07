@@ -1,10 +1,7 @@
 <script lang="ts">
     import { push } from "svelte-spa-router";
-    import Hero from "../../components/Hero.svelte";
-    import HighScoreList from "../../components/HighScoreList.svelte";
     import connectPhantom from "../../utils/connectPhantom";
 import connectMetamask from "../../utils/connectMetamask";
-    import nfts from "../stores/nfts";
 
     // import connectPhantom from "../utils/connectPhantom"
     </script>
@@ -44,7 +41,6 @@ import connectMetamask from "../../utils/connectMetamask";
         }}
         on:click={async () => {
             await connectMetamask();
-            console.log('nfts from login page',$nfts);
                 await push ('/displaychars');
         }}
     />
