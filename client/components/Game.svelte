@@ -1596,10 +1596,9 @@
     }
 
     .game-shell {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100dvh;
+        position: relative;
+        width: 100%;
+        height: 100%;
         border-radius: 0;
         overflow: hidden;
         box-shadow: none;
