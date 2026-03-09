@@ -76,17 +76,16 @@
 
 </script>
 <p class="season-label text-secondary">Current Season: {currentSeason}</p>
-<div class="carousel rounded-box ">
+<div class="leaderboard-scroll" aria-label="Current season leaderboard">
 {#each seasonScores as p1score}
-    
-
-    <div class="carousel-item rounded-md">
-    
-        <!-- <br> Token: {p1score.token} -->
-        <img src={p1score.imageURL} height="200px" width="200px" alt="super panda">
-        <p class="mb-5 text-secondary">   Name: {p1score.playerName}
-    <br>    Score: {p1score.score}</p>
-        </div>
+    <article class="leaderboard-card rounded-md">
+        <img src={p1score.imageURL} alt="super panda" class="leaderboard-image">
+        <p class="leaderboard-text text-secondary">
+            <span class="leaderboard-meta">Name:</span> {p1score.playerName}
+            <br>
+            <span class="leaderboard-meta">Score:</span> {p1score.score}
+        </p>
+    </article>
 
 {/each}
 </div>
@@ -98,23 +97,71 @@
 {#if allTimeUnavailable}
     <p class="season-label text-secondary">(all-time leaderboard unavailable)</p>
 {/if}
-<div class="carousel rounded-box ">
+<div class="leaderboard-scroll" aria-label="All-time leaderboard">
 {#each allTimeScores as p1score}
-
-    <div class="carousel-item rounded-md">
-    
-        <img src={p1score.imageURL} height="200px" width="200px" alt="super panda">
-        <p class="mb-5 text-secondary">   Name: {p1score.playerName}
-    <br>    Score: {p1score.score}</p>
-        </div>
+    <article class="leaderboard-card rounded-md">
+        <img src={p1score.imageURL} alt="super panda" class="leaderboard-image">
+        <p class="leaderboard-text text-secondary">
+            <span class="leaderboard-meta">Name:</span> {p1score.playerName}
+            <br>
+            <span class="leaderboard-meta">Score:</span> {p1score.score}
+        </p>
+    </article>
 
 {/each}
 </div>
 
 <style>
     .season-label {
-        font-size: 14px;
+        font-size: clamp(22px, 2.4vw, 34px);
         font-weight: 700;
-        margin: 4px 0 8px 4px;
+        line-height: 1.1;
+        margin: 10px 0 12px 4px;
+        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .leaderboard-scroll {
+        width: 100%;
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 4px 4px 14px;
+        box-sizing: border-box;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .leaderboard-card {
+        flex: 0 0 clamp(200px, 28vw, 320px);
+        scroll-snap-align: start;
+        background: rgba(0, 0, 0, 0.38);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        overflow: hidden;
+    }
+
+    .leaderboard-image {
+        display: block;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+    }
+
+    .leaderboard-text {
+        margin: 0;
+        padding: 8px 10px 10px;
+        font-size: clamp(15px, 4.2vw, 18px);
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    .leaderboard-meta {
+        font-weight: 700;
+    }
+
+    @media (max-width: 768px) {
+        .leaderboard-card {
+            flex-basis: clamp(190px, 55vw, 280px);
+        }
     }
 </style>

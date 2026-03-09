@@ -23,7 +23,7 @@
             <!-- <p>There is no description available</p> <br /> -->
         {/if}
        
-        <h1 class="mb-2 text-xl font-bold text-secondary">{nft.title}</h1>
+        <h1 class="nft-title">{nft.title}</h1>
         <div class="the-NFT">
             <img
                 src={transformURLs(nft.imageURL)}
@@ -54,16 +54,33 @@
     p {
         text-align: center;
     }
+
+    .nft-title {
+        margin: 0 0 10px;
+        text-align: center;
+        font-size: clamp(28px, 6vw, 40px);
+        font-weight: 700;
+        line-height: 1.15;
+        color: #f3f7ff;
+        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+        word-break: break-word;
+    }
+
     .the-NFT {
         display: flex;
         justify-content: center;
     }
+
     img {
         border-radius: 8px;
-        max-width: 200px;
-        /* 
-  justify-content: center; */
+        width: 100%;
+        max-width: min(100%, 300px);
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        display: block;
+        cursor: pointer;
     }
+
     .the-NFT {
         margin: 0 auto;
     }

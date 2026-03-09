@@ -152,6 +152,15 @@
 </main>
 
 <style>
+  main {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  :global(body) {
+    overflow-x: hidden;
+  }
+
   .game-shell {
     position: fixed;
     inset: 0;
@@ -190,5 +199,14 @@
   .game-shell .game-content > .w-full {
     width: 100%;
     height: 100%;
+  }
+
+  @media (max-width: 768px) {
+    .audio-toggle {
+      top: 10px;
+      right: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
   }
 </style>
