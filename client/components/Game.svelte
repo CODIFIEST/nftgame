@@ -122,7 +122,6 @@
     let jumpHoldTimeMs = 0;
     let jumpPressedLastFrame = false;
     let onWindowOnline: (() => void) | undefined;
-    let onWindowResize: (() => void) | undefined;
     const scoreQueue = new ScoreSyncQueue();
     let pendingSyncCount = 0;
     let lastSyncAt: string | null = null;
@@ -227,33 +226,6 @@
 
     async function manualSyncNow() {
         await flushPendingScores();
-    }
-
-    function resolveScaleMode(): number {
-        if (typeof window === "undefined") {
-            return Phaser.Scale.ENVELOP;
-        }
-        const userAgent = window.navigator.userAgent ?? "";
-        if (/phantom/i.test(userAgent)) {
-            return Phaser.Scale.FIT;
-        }
-        const isTouchDevice = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-        const isPortrait = window.innerHeight > window.innerWidth;
-        return isTouchDevice && isPortrait ? Phaser.Scale.FIT : Phaser.Scale.ENVELOP;
-    }
-
-    function syncScaleMode() {
-        if (!game) {
-            return;
-        }
-        const nextScaleMode = resolveScaleMode();
-        if (game.scale.scaleMode !== nextScaleMode) {
-            game.scale.scaleMode = nextScaleMode;
-            game.scale.refresh();
-            if (sceneRef) {
-                centerZoomedCamera(sceneRef);
-            }
-        }
     }
 
     function resetSessionState() {
@@ -667,13 +639,9 @@
                 void beginRun();
             }
         };
-        onWindowResize = () => {
-            syncScaleMode();
-        };
         window.addEventListener("error", onWindowError);
         window.addEventListener("unhandledrejection", onUnhandledRejection);
         window.addEventListener("keydown", onWindowKeydown);
-        window.addEventListener("resize", onWindowResize);
 
         game = new Phaser.Game({
             type: Phaser.AUTO,
@@ -681,7 +649,7 @@
             height: GAME_HEIGHT,
             parent: GAME_CONTAINER_ID,
             scale: {
-                mode: resolveScaleMode(),
+                mode: Phaser.Scale.ENVELOP,
                 autoCenter: Phaser.Scale.CENTER_BOTH,
                 width: GAME_WIDTH,
                 height: GAME_HEIGHT,
@@ -711,7 +679,6 @@
         } else {
             console.warn("[GameDebug] canvas element not found immediately after game creation");
         }
-        syncScaleMode();
 
         debugTimerId = window.setTimeout(() => {
             if (!sceneRef) {
@@ -736,9 +703,6 @@
         }
         if (onWindowOnline) {
             window.removeEventListener("online", onWindowOnline);
-        }
-        if (onWindowResize) {
-            window.removeEventListener("resize", onWindowResize);
         }
         if (onWindowKeydown) {
             window.removeEventListener("keydown", onWindowKeydown);
@@ -882,6 +846,7 @@
     }
 
     .game-shell {
+        --mobile-control-band: 0px;
         position: relative;
         width: 100%;
         height: 100%;
@@ -892,8 +857,11 @@
     }
 
     .game-canvas {
-        width: 100%;
-        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: var(--mobile-control-band);
         background: radial-gradient(circle at 20% 20%, #3e5a85 0%, #18253f 46%, #0c1423 100%);
     }
 
@@ -1151,7 +1119,7 @@
         position: absolute;
         left: 0;
         right: 0;
-        bottom: max(16px, env(safe-area-inset-bottom));
+        bottom: calc(env(safe-area-inset-bottom) + 10px);
         display: none;
         justify-content: center;
         gap: 14px;
@@ -1204,6 +1172,10 @@
     }
 
     @media (hover: none) and (pointer: coarse) {
+        .game-shell {
+            --mobile-control-band: calc(108px + env(safe-area-inset-bottom));
+        }
+
         .mobile-controls {
             display: flex;
         }
