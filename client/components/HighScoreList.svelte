@@ -116,24 +116,24 @@
         font-size: clamp(22px, 2.4vw, 34px);
         font-weight: 700;
         line-height: 1.1;
-        margin: 10px 0 12px 4px;
+        margin: 6px 0 8px 4px;
         text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
     }
 
     .leaderboard-scroll {
         width: 100%;
         display: flex;
-        gap: 12px;
+        gap: 10px;
         overflow-x: auto;
         overflow-y: hidden;
-        padding: 4px 4px 14px;
+        padding: 2px 4px 10px;
         box-sizing: border-box;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
     }
 
     .leaderboard-card {
-        flex: 0 0 clamp(200px, 28vw, 320px);
+        flex: 0 0 clamp(170px, 22vw, 240px);
         scroll-snap-align: start;
         background: rgba(0, 0, 0, 0.38);
         border: 1px solid rgba(255, 255, 255, 0.2);
@@ -149,9 +149,9 @@
 
     .leaderboard-text {
         margin: 0;
-        padding: 8px 10px 10px;
-        font-size: clamp(15px, 4.2vw, 18px);
-        line-height: 1.3;
+        padding: 6px 8px 8px;
+        font-size: clamp(13px, 2.2vw, 16px);
+        line-height: 1.25;
         word-break: break-word;
     }
 
@@ -160,8 +160,18 @@
     }
 
     @media (max-width: 768px) {
+        .season-label {
+            font-size: clamp(18px, 5vw, 24px);
+            margin: 4px 0 6px 2px;
+        }
+
         .leaderboard-card {
-            flex-basis: clamp(190px, 55vw, 280px);
+            flex-basis: clamp(136px, 38vw, 176px);
+        }
+
+        .leaderboard-text {
+            font-size: clamp(12px, 3.2vw, 14px);
+            padding: 4px 6px 6px;
         }
     }
 </style>
