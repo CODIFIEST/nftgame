@@ -122,6 +122,7 @@
     let jumpHoldTimeMs = 0;
     let jumpPressedLastFrame = false;
     let onWindowOnline: (() => void) | undefined;
+    let onWindowResize: (() => void) | undefined;
     const scoreQueue = new ScoreSyncQueue();
     let pendingSyncCount = 0;
     let lastSyncAt: string | null = null;
@@ -226,6 +227,33 @@
 
     async function manualSyncNow() {
         await flushPendingScores();
+    }
+
+    function resolveScaleMode(): number {
+        if (typeof window === "undefined") {
+            return Phaser.Scale.ENVELOP;
+        }
+        const userAgent = window.navigator.userAgent ?? "";
+        if (/phantom/i.test(userAgent)) {
+            return Phaser.Scale.FIT;
+        }
+        const isTouchDevice = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+        const isPortrait = window.innerHeight > window.innerWidth;
+        return isTouchDevice && isPortrait ? Phaser.Scale.FIT : Phaser.Scale.ENVELOP;
+    }
+
+    function syncScaleMode() {
+        if (!game) {
+            return;
+        }
+        const nextScaleMode = resolveScaleMode();
+        if (game.scale.scaleMode !== nextScaleMode) {
+            game.scale.scaleMode = nextScaleMode;
+            game.scale.refresh();
+            if (sceneRef) {
+                centerZoomedCamera(sceneRef);
+            }
+        }
     }
 
     function resetSessionState() {
@@ -639,9 +667,13 @@
                 void beginRun();
             }
         };
+        onWindowResize = () => {
+            syncScaleMode();
+        };
         window.addEventListener("error", onWindowError);
         window.addEventListener("unhandledrejection", onUnhandledRejection);
         window.addEventListener("keydown", onWindowKeydown);
+        window.addEventListener("resize", onWindowResize);
 
         game = new Phaser.Game({
             type: Phaser.AUTO,
@@ -649,7 +681,7 @@
             height: GAME_HEIGHT,
             parent: GAME_CONTAINER_ID,
             scale: {
-                mode: Phaser.Scale.ENVELOP,
+                mode: resolveScaleMode(),
                 autoCenter: Phaser.Scale.CENTER_BOTH,
                 width: GAME_WIDTH,
                 height: GAME_HEIGHT,
@@ -679,6 +711,7 @@
         } else {
             console.warn("[GameDebug] canvas element not found immediately after game creation");
         }
+        syncScaleMode();
 
         debugTimerId = window.setTimeout(() => {
             if (!sceneRef) {
@@ -703,6 +736,9 @@
         }
         if (onWindowOnline) {
             window.removeEventListener("online", onWindowOnline);
+        }
+        if (onWindowResize) {
+            window.removeEventListener("resize", onWindowResize);
         }
         if (onWindowKeydown) {
             window.removeEventListener("keydown", onWindowKeydown);
