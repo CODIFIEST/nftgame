@@ -199,4 +199,19 @@
         border-color: rgba(255, 255, 255, 0.34);
         text-shadow: none;
     }
+
+    :global(.phantom-browser) .hero-copy,
+    :global(.phantom-browser) .title,
+    :global(.phantom-browser) .subtitle,
+    :global(.phantom-browser) .name-btn {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    :global(.phantom-browser) .subtitle {
+        color: #eef4ff !important;
+        -webkit-text-fill-color: #eef4ff !important;
+    }
 </style>
