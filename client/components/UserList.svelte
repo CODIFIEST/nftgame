@@ -2,6 +2,7 @@
     import axios from "axios"
     import { onMount } from "svelte";
     let users=[];
+    /** Returns users. */
     async function getUsers() {
        const result =  await axios.get('http://localhost:3000/user')
        console.log(result.data) //result.data has all the goods from axios

@@ -1,10 +1,11 @@
-import type * as Phaser from "phaser";
+import * as Phaser from "phaser";
 import { keepBombsVisible } from "./bombs";
 import { visibleHorizontalRange } from "./bounds";
 import { updatePlayerMotion } from "./playerMotion";
 import { setupGameScene } from "./sceneSetup";
 import type { LevelConfig, PlatformConfig } from "./levels";
 
+/** Inputs required to initialize the gameplay scene runtime. */
 type CreateSceneRuntimeArgs = {
     scene: Phaser.Scene;
     hasRunStarted: boolean;
@@ -15,7 +16,12 @@ type CreateSceneRuntimeArgs = {
     backgroundScale: number;
     baseCameraZoom: number;
     normalizePlayerSprite: (player: Phaser.Physics.Arcade.Sprite, scene: Phaser.Scene) => void;
-    applyBackgroundSection: (scene: Phaser.Scene, level: number, skipTween?: boolean) => void;
+    applyBackgroundSection: (
+        scene: Phaser.Scene,
+        background: Phaser.GameObjects.Image | null,
+        levelNumber: number,
+        animate: boolean,
+    ) => void;
     hitBomb: (
         this: Phaser.Scene,
         colliderPlayer: Phaser.GameObjects.GameObject,
@@ -25,6 +31,7 @@ type CreateSceneRuntimeArgs = {
     verifyAllLevelFirstLedgeReachability: (scene: Phaser.Scene, levels: LevelConfig[]) => void;
 };
 
+/** Inputs required to compute one frame of gameplay runtime updates. */
 type UpdateSceneRuntimeArgs = {
     sceneRef: Phaser.Scene | null;
     player: Phaser.Physics.Arcade.Sprite | null;
@@ -57,12 +64,14 @@ type UpdateSceneRuntimeArgs = {
     placePlayerAtLevelStart: (player: Phaser.Physics.Arcade.Sprite, layout: PlatformConfig[], level: number) => void;
 };
 
+/** Per-frame state values returned from updateSceneRuntime. */
 export type UpdateSceneRuntimeResult = {
     jumpHoldTimeMs: number;
     jumpPressedLastFrame: boolean;
     lastNearMissShakeAt: number;
 };
 
+/** Initializes scene objects, theme state, and starting physics behavior. */
 export function createSceneRuntime(args: CreateSceneRuntimeArgs): {
     background: Phaser.GameObjects.Image | null;
     glowOverlay: Phaser.GameObjects.Rectangle | null;
@@ -83,14 +92,13 @@ export function createSceneRuntime(args: CreateSceneRuntimeArgs): {
     });
     args.applyLevelTheme(args.scene, true);
     args.verifyAllLevelFirstLedgeReachability(args.scene, args.levels);
-    args.scene.physics.add.collider(setup.player, setup.platforms);
-    args.scene.physics.add.collider(setup.bombs, setup.platforms);
     if (!args.hasRunStarted) {
         args.scene.physics.pause();
     }
     return setup;
 }
 
+/** Advances one gameplay frame: motion, bomb behavior, camera effects, and bounds. */
 export function updateSceneRuntime(args: UpdateSceneRuntimeArgs): UpdateSceneRuntimeResult {
     if (!args.player || !args.cursors || !args.bombs || args.isDead || !args.hasRunStarted || args.isPaused) {
         return {

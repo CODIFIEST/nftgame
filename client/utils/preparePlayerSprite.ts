@@ -1,3 +1,4 @@
+/** Performs image from URL. */
 function imageFromUrl(url: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const image = new Image();
@@ -8,6 +9,7 @@ function imageFromUrl(url: string): Promise<HTMLImageElement> {
     });
 }
 
+/** Performs color distance. */
 function colorDistance(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number): number {
     const dr = r1 - r2;
     const dg = g1 - g2;
@@ -15,6 +17,7 @@ function colorDistance(r1: number, g1: number, b1: number, r2: number, g2: numbe
     return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
+/** Performs luminance. */
 function luminance(r: number, g: number, b: number): number {
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
@@ -62,6 +65,7 @@ export default async function preparePlayerSprite(url: string): Promise<string> 
     const visited = new Uint8Array(width * height);
     const queue: number[] = [];
 
+    /** Performs push if background candidate. */
     function pushIfBackgroundCandidate(x: number, y: number) {
         if (x < 0 || y < 0 || x >= width || y >= height) {
             return;

@@ -1,6 +1,7 @@
 import type * as Phaser from "phaser";
 import { buildLayoutFromAnchor, type LevelConfig } from "./levels";
 
+/** Configuration options for level theme. */
 export type LevelThemeOptions = {
     preservePlayer?: boolean;
     anchor?: { x: number; y: number };
@@ -10,6 +11,7 @@ export type LevelThemeOptions = {
     sequentialReveal?: boolean;
 };
 
+/** Arguments for apply level theme. */
 type ApplyLevelThemeArgs = {
     scene: Phaser.Scene;
     level: number;
@@ -63,6 +65,7 @@ type ApplyLevelThemeArgs = {
     levelBanner: (scene: Phaser.Scene, text: string) => void;
 };
 
+/** Applies level theme. */
 export function applyLevelTheme(args: ApplyLevelThemeArgs): Phaser.Physics.Arcade.StaticGroup {
     const config = args.levels[Math.min(args.level - 1, args.levels.length - 1)];
     console.log("[GameDebug] applyLevelTheme", { level: args.level, title: config.title, showBanner: args.showBanner });

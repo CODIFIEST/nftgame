@@ -1,8 +1,10 @@
+/** Type definition for persisted NFT. */
 export type PersistedNft = {
     tokenAddress?: string;
     imageURL?: string;
 };
 
+/** Arguments for hydrate player session. */
 type HydratePlayerSessionArgs = {
     playerNameKey: string;
     playerImageKey: string;
@@ -15,6 +17,7 @@ type HydratePlayerSessionArgs = {
     setPlayerNft: (value: unknown) => void;
 };
 
+/** Performs hydrate persisted player state. */
 export function hydratePersistedPlayerState(args: HydratePlayerSessionArgs): void {
     if (typeof window === "undefined") {
         return;
@@ -40,6 +43,7 @@ export function hydratePersistedPlayerState(args: HydratePlayerSessionArgs): voi
     }
 }
 
+/** Returns persisted NFT. */
 export function getPersistedNft(playerNftKey: string): PersistedNft | null {
     if (typeof window === "undefined") {
         return null;
@@ -56,6 +60,7 @@ export function getPersistedNft(playerNftKey: string): PersistedNft | null {
     }
 }
 
+/** Performs data URL to object URL. */
 export function dataUrlToObjectUrl(dataUrl: string): string | null {
     const matches = dataUrl.match(/^data:(.*?);base64,(.*)$/);
     if (!matches) {

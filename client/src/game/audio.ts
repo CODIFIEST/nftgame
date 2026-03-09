@@ -1,5 +1,6 @@
 let audioContext: AudioContext | null = null;
 
+/** Returns audio context. */
 function getAudioContext(): AudioContext | null {
     if (audioContext) {
         return audioContext;
@@ -17,6 +18,7 @@ function getAudioContext(): AudioContext | null {
     return audioContext;
 }
 
+/** Performs play tone. */
 export function playTone(
     frequency: number,
     durationMs: number,
@@ -46,6 +48,7 @@ export function playTone(
     oscillator.stop(now + durationMs / 1000);
 }
 
+/** Performs dispose audio. */
 export async function disposeAudio(): Promise<void> {
     if (!audioContext) {
         return;

@@ -2,10 +2,14 @@ import * as Phaser from "phaser";
 import { GAME_WIDTH, PLAYER_BOMB_SAFE_DISTANCE } from "./constants";
 import { bombStyleForLevel } from "./sceneMath";
 
+/** Type definition for bomb group. */
 type BombGroup = Phaser.Physics.Arcade.Group;
+/** Type definition for arcade sprite. */
 type ArcadeSprite = Phaser.Physics.Arcade.Sprite;
+/** Type definition for arcade image. */
 type ArcadeImage = Phaser.Physics.Arcade.Image;
 
+/** Applies bomb style. */
 export function applyBombStyle(bomb: ArcadeImage, currentLevel: number): void {
     const style = bombStyleForLevel(currentLevel);
     bomb.setTint(style.tint);
@@ -13,6 +17,7 @@ export function applyBombStyle(bomb: ArcadeImage, currentLevel: number): void {
     bomb.setAlpha(0.96);
 }
 
+/** Spawns bomb. */
 export function spawnBomb(
     bombs: BombGroup,
     player: ArcadeSprite | null,
@@ -36,6 +41,7 @@ export function spawnBomb(
     bomb.setVelocity(Phaser.Math.Between(-speedBase, speedBase), Phaser.Math.Between(80, 160));
 }
 
+/** Performs enforce bomb safe zone. */
 export function enforceBombSafeZone(
     bombs: BombGroup,
     player: ArcadeSprite | null,
@@ -69,6 +75,7 @@ export function enforceBombSafeZone(
     });
 }
 
+/** Performs keep bombs visible. */
 export function keepBombsVisible(
     bombs: BombGroup,
     visibleTopY: number,
@@ -99,6 +106,7 @@ export function keepBombsVisible(
     });
 }
 
+/** Synchronizes bomb count. */
 export function syncBombCount(
     bombs: BombGroup,
     player: ArcadeSprite | null,

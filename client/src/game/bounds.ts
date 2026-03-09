@@ -1,8 +1,10 @@
+/** Result shape returned by horizontal constraint. */
 export type HorizontalConstraintResult = {
     x: number;
     velocityX: number;
 };
 
+/** Performs clamp to range. */
 export function clampToRange(value: number, min: number, max: number): number {
     if (value < min) {
         return min;
@@ -13,6 +15,7 @@ export function clampToRange(value: number, min: number, max: number): number {
     return value;
 }
 
+/** Constrains horizontal. */
 export function constrainHorizontal(
     x: number,
     velocityX: number,
@@ -35,6 +38,7 @@ export function constrainHorizontal(
     return { x, velocityX };
 }
 
+/** Performs visible horizontal range. */
 export function visibleHorizontalRange(
     viewLeftX: number,
     viewRightX: number,

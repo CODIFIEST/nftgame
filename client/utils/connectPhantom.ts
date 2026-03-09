@@ -4,6 +4,7 @@ import { account } from "../src/stores/account";
 // import { NftSaleMarketplace } from "alchemy-sdk";
 import nfts from "../src/stores/nfts";
 
+/** Performs connect phantom. */
 async function connectPhantom (){
     console.log("test account", account)
     const phantom = await (window as any).phantom.solana.connect();

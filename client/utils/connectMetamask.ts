@@ -4,10 +4,12 @@ import fetchCantos from "./getCantosNFTs"
 import nfts from "../src/stores/nfts";
 import type { NFT } from "../../server/domain/nft";
 import { get } from "svelte/store";
+/** Type definition for ethereum window. */
 type EthereumWindow = {
     ethereum: any;
 };
 
+/** Performs connect metamask. */
 async function connectMetamask(){
   const provider = new ethers.providers.Web3Provider((window as any as EthereumWindow).ethereum);
 

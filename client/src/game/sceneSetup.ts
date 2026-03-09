@@ -1,5 +1,6 @@
 import * as Phaser from "phaser";
 
+/** Arguments for setup game scene. */
 type SetupGameSceneArgs = {
     gameWidth: number;
     gameHeight: number;
@@ -21,6 +22,7 @@ type SetupGameSceneArgs = {
     centerZoomedCamera: (scene: Phaser.Scene) => void;
 };
 
+/** Result shape returned by setup game scene. */
 export type SetupGameSceneResult = {
     background: Phaser.GameObjects.Image;
     glowOverlay: Phaser.GameObjects.Rectangle;
@@ -30,6 +32,7 @@ export type SetupGameSceneResult = {
     cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 };
 
+/** Performs setup game scene. */
 export function setupGameScene(scene: Phaser.Scene, args: SetupGameSceneArgs): SetupGameSceneResult {
     scene.physics.world.timeScale = 1;
     scene.physics.world.setBounds(0, 0, args.gameWidth, args.gameHeight);

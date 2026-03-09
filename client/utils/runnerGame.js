@@ -135,6 +135,7 @@ class playGame extends Phaser.Scene{
         }
     }
 };
+/** Performs resize. */
 function resize(){
     let canvas = document.querySelector("canvas");
     let windowWidth = window.innerWidth;

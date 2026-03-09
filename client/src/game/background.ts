@@ -1,6 +1,7 @@
 import type * as Phaser from "phaser";
 import { backgroundTargetPositionForLevel } from "./sceneMath";
 
+/** Applies background section. */
 export function applyBackgroundSection(
     scene: Phaser.Scene,
     background: Phaser.GameObjects.Image | null,

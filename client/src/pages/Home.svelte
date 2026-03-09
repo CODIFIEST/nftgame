@@ -6,6 +6,7 @@
     import { push } from "svelte-spa-router";
     const PLAYER_NAME_KEY = "nftgame.playerName";
 
+    /** Sets player name. */
     function setPlayerName() {
         player1.set({
             playerName: $playerName,
@@ -15,6 +16,7 @@
         });
     }
 
+    /** Performs submit name. */
     async function submitName() {
         setPlayerName();
         await push('/login');
@@ -70,7 +72,7 @@
         padding: 72px 12px 14px;
         box-sizing: border-box;
         overflow-x: hidden;
-        color: #eef4ff;
+        color: var(--theme-text);
     }
 
     .landing-form {
@@ -89,7 +91,7 @@
         max-width: 100%;
         min-height: 54px;
         box-sizing: border-box;
-        border: 1px solid rgba(255, 255, 255, 0.32);
+        border: 1px solid var(--theme-border);
         border-radius: 12px;
         padding: 0 16px;
         font-size: 18px;
@@ -106,19 +108,19 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: #f8fbff;
+        color: var(--theme-button-text);
         width: auto;
         max-width: 100%;
         min-height: 54px;
         padding: 0 20px;
         border-radius: 12px;
         box-sizing: border-box;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        background: rgba(43, 51, 66, 0.96);
+        border: 1px solid var(--theme-border);
+        background: var(--theme-button-bg);
         font-weight: 700;
         font-size: 22px;
         line-height: 1;
-        -webkit-text-fill-color: #f8fbff;
+        -webkit-text-fill-color: var(--theme-button-text);
         appearance: none;
         -webkit-appearance: none;
         cursor: pointer;
@@ -133,7 +135,7 @@
         box-sizing: border-box;
         border-radius: 12px;
         background: rgba(6, 18, 34, 0.28);
-        border: 1px solid rgba(255, 255, 255, 0.18);
+        border: 1px solid var(--theme-border);
     }
 
     .hero-title {
@@ -145,8 +147,8 @@
         font-weight: 800;
         line-height: 1.08;
         letter-spacing: -0.01em;
-        color: #ffffff;
-        -webkit-text-fill-color: #ffffff;
+        color: var(--theme-heading);
+        -webkit-text-fill-color: var(--theme-heading);
         display: block;
     }
 
@@ -157,8 +159,8 @@
         max-width: 42ch;
         width: 100%;
         box-sizing: border-box;
-        color: #eef4ff;
-        -webkit-text-fill-color: #eef4ff;
+        color: var(--theme-text);
+        -webkit-text-fill-color: var(--theme-text);
         display: block;
         overflow-wrap: anywhere;
         word-break: break-word;

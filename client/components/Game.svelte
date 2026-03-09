@@ -35,9 +35,11 @@
     import { applyBackgroundSection } from "../src/game/background";
     import { runSanityChecks } from "../src/game/debug";
     import { clearHudPulseTimers, triggerHudPulse as triggerHudPulseRuntime } from "../src/game/hudPulse";
+    import { applyWillReadFrequentlyHint } from "../src/game/canvasHints";
     import { applyLevelTheme as applyLevelThemeRuntime, type LevelThemeOptions } from "../src/game/levelTheme";
     import { levelBanner, normalizePlayerSprite, resetStars as resetStarsForLevel } from "../src/game/levelVisuals";
     import { updatePlayerMotion } from "../src/game/playerMotion";
+    import { ensureMetalGirderTexture } from "../src/game/platformTexture";
     import { preloadCoreAssets, selectPlayerSpriteSource } from "../src/game/preloadAssets";
     import {
         flushPendingScoresRuntime,
@@ -59,6 +61,7 @@
     import {
         buildLevels,
         clamp,
+        /** Type definition for level config. */
         type LevelConfig,
     } from "../src/game/levels";
     import {
@@ -152,11 +155,13 @@
         persistGameplayPreferences({ reducedMotion, leftHandedMobileControls });
     }
 
+    /** Returns the active level config, extending generated levels when needed. */
     function activeLevelConfig(): LevelConfig {
         ensureLevelExists(level);
         return LEVELS[Math.min(level - 1, LEVELS.length - 1)];
     }
 
+    /** Extends LEVELS so the requested level number has generated config. */
     function ensureLevelExists(levelNumber: number) {
         if (levelNumber <= LEVELS.length) {
             return;
@@ -166,6 +171,7 @@
         LEVELS.push(...generated.slice(LEVELS.length));
     }
 
+    /** Requests a backend run ticket used to validate score submissions. */
     async function requestRunTicket(): Promise<void> {
         try {
             await requestRunTicketRuntime(API_BASE_URL, runSession);
@@ -178,6 +184,7 @@
         }
     }
 
+    /** Starts the run from the overlay and resumes gameplay physics. */
     async function beginRun() {
         if (!sceneRef || hasRunStarted || isDead) {
             return;
@@ -193,6 +200,7 @@
         playTone(640, 100, 0.02, "triangle");
     }
 
+    /** Pauses or resumes the current run when pausing is allowed. */
     function togglePause() {
         if (!sceneRef || !hasRunStarted || isDead || showGameOver || isLevelTransitioning) {
             return;
@@ -205,15 +213,18 @@
         }
     }
 
+    /** Refreshes pending score sync counters shown in the HUD. */
     function refreshPendingSyncCount() {
         pendingSyncCount = scoreQueue.getPendingCount();
         lastSyncAt = scoreQueue.getLastSyncAt();
     }
 
+    /** Posts a single score payload to the backend API. */
     async function postScorePayload(payload: ScorePayload, timeoutMs: number) {
         await postScorePayloadRuntime(API_BASE_URL, payload, timeoutMs);
     }
 
+    /** Flushes queued score submissions with retry/backoff behavior. */
     async function flushPendingScores() {
         await flushPendingScoresRuntime({
             scoreQueue,
@@ -224,10 +235,12 @@
         });
     }
 
+    /** Triggers a user-initiated flush of queued score submissions. */
     async function manualSyncNow() {
         await flushPendingScores();
     }
 
+    /** Resets transient run state before a fresh game starts. */
     function resetSessionState() {
         score = 0;
         level = 1;
@@ -252,6 +265,7 @@
         resetRunSession(runSession);
     }
 
+    /** Keeps active bomb count aligned to the current level target. */
     function syncBombCount() {
         const target = activeLevelConfig().targetBombs;
         const currentCount = bombs.countActive(true);
@@ -260,6 +274,7 @@
         syncBombCountForLevel(bombs, player, level, target, activeLevelConfig().bombSpeed);
     }
 
+    /** Rebuilds collectible stars for the current level layout. */
     function resetStars(activePlatforms: Phaser.Physics.Arcade.StaticGroup = platforms) {
         console.log("[GameDebug] resetStars", { level, total: activeLevelConfig().starCount });
         stars = resetStarsForLevel({
@@ -274,6 +289,7 @@
         });
     }
 
+    /** Delegates HUD pulse animation state updates to the runtime helper. */
     function triggerHudPulse(kind: "score" | "combo" | "level") {
         triggerHudPulseRuntime({
             kind,
@@ -291,6 +307,7 @@
         });
     }
 
+    /** Applies visuals, layout transitions, and audio cues for the active level. */
     function applyLevelTheme(scene: Phaser.Scene, showBanner = false, options: LevelThemeOptions = {}) {
         ensureLevelExists(level);
         platforms = applyLevelThemeRuntime({
@@ -331,6 +348,7 @@
         });
     }
 
+    /** Builds and submits the run score, queuing when offline if needed. */
     async function saveScore() {
         const selectedNft = $player1nft ?? getPersistedNft(PLAYER_NFT_KEY);
         await saveScoreRuntime({
@@ -353,6 +371,7 @@
         });
     }
 
+    /** Handles player death flow, game-over UI state, and score persistence. */
     async function hitBomb(this: Phaser.Scene, colliderPlayer: Phaser.GameObjects.GameObject) {
         console.log("[GameDebug] hitBomb", { isDead, scorePosted, score });
         if (isDead || scorePosted) {
@@ -395,6 +414,7 @@
         await saveScore();
     }
 
+    /** Handles star collection, combo scoring, and level advancement checks. */
     function collectStar(this: Phaser.Scene, _: Phaser.GameObjects.GameObject, rawStar: Phaser.GameObjects.GameObject) {
         const star = rawStar as Phaser.Physics.Arcade.Image;
         star.disableBody(true, true);
@@ -442,6 +462,7 @@
         }
     }
 
+    /** Phaser lifecycle hook that preloads scene assets. */
     function preload(this: Phaser.Scene) {
         console.log("[GameDebug] preload start");
         this.load.on("start", () => console.log("[GameDebug] asset load start"));
@@ -461,9 +482,11 @@
         preloadCoreAssets(this, selected.selectedPlayerImage);
     }
 
+    /** Phaser lifecycle hook that creates scene objects and physics. */
     function create(this: Phaser.Scene) {
         console.log("[GameDebug] create start");
         sceneRef = this;
+        ensureMetalGirderTexture(this);
         const setup = setupGameScene(this, {
             gameWidth: GAME_WIDTH,
             gameHeight: GAME_HEIGHT,
@@ -490,6 +513,7 @@
         console.log("[GameDebug] create complete");
     }
 
+    /** Phaser lifecycle hook that updates gameplay on every frame. */
     function update() {
         if (!player || !cursors || isDead || !hasRunStarted || isPaused) {
             return;
@@ -562,6 +586,7 @@
         }
     }
 
+    /** Reloads the app to start a fresh run after game over. */
     function retryRun() {
         if (!canRestartAfterDeath || submittingScore) {
             return;
@@ -569,6 +594,7 @@
         location.reload();
     }
 
+    /** Updates mobile touch-control flags consumed by movement logic. */
     function setTouchControl(control: "left" | "right" | "jump", active: boolean) {
         if (control === "left") {
             touchLeftActive = active;
@@ -581,6 +607,7 @@
         touchJumpActive = active;
     }
 
+    /** Navigates back to menu and reloads to reset game runtime state. */
     async function backToMenu() {
         if (!canRestartAfterDeath || submittingScore) {
             return;
@@ -591,6 +618,7 @@
 
     onMount(() => {
         console.log("[GameDebug] onMount start");
+        applyWillReadFrequentlyHint(Phaser);
         assertGameRuntimeConfig();
         hydratePersistedPlayerState({
             playerNameKey: PLAYER_NAME_KEY,
@@ -838,10 +866,10 @@
 
     :global(:root) {
         --ui-shell-shadow: rgba(4, 10, 26, 0.55);
-        --ui-border: rgba(219, 234, 255, 0.24);
-        --ui-ink: #edf5ff;
-        --ui-muted: #a8bfde;
-        --ui-warm: #ffd58f;
+        --ui-border: var(--theme-border);
+        --ui-ink: var(--theme-text);
+        --ui-muted: var(--theme-muted);
+        --ui-warm: var(--theme-accent);
         --ui-cool: #8fd2ff;
     }
 
@@ -906,9 +934,9 @@
     }
 
     .sync-btn {
-        border: 1px solid rgba(197, 226, 255, 0.45);
-        background: rgba(13, 29, 56, 0.86);
-        color: #d9ebff;
+        border: 1px solid var(--theme-border);
+        background: var(--theme-button-bg);
+        color: var(--theme-button-text);
         border-radius: 8px;
         padding: 5px 9px;
         font-size: 12px;
@@ -934,9 +962,9 @@
     }
 
     .control-action {
-        border: 1px solid rgba(197, 226, 255, 0.45);
-        background: rgba(13, 29, 56, 0.9);
-        color: #d9ebff;
+        border: 1px solid var(--theme-border);
+        background: var(--theme-button-bg);
+        color: var(--theme-button-text);
         border-radius: 8px;
         padding: 6px 10px;
         font-size: 12px;
@@ -1033,7 +1061,6 @@
 
     .value {
         color: var(--ui-ink);
-        font-family: "Trebuchet MS", "Lucida Sans Unicode", sans-serif;
         font-size: 20px;
         font-weight: 800;
         line-height: 1.1;

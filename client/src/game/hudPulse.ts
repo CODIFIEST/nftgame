@@ -1,11 +1,14 @@
+/** Type definition for pulse kind. */
 export type PulseKind = "score" | "combo" | "level";
 
+/** Type definition for HUD pulse timers. */
 export type HudPulseTimers = {
     scorePulseTimer?: number;
     comboPulseTimer?: number;
     levelPulseTimer?: number;
 };
 
+/** Arguments for trigger HUD pulse. */
 type TriggerHudPulseArgs = {
     kind: PulseKind;
     reducedMotion: boolean;
@@ -15,6 +18,7 @@ type TriggerHudPulseArgs = {
     setLevelPulse: (value: boolean) => void;
 };
 
+/** Performs trigger HUD pulse. */
 export function triggerHudPulse(args: TriggerHudPulseArgs): void {
     if (args.reducedMotion) {
         return;
@@ -53,6 +57,7 @@ export function triggerHudPulse(args: TriggerHudPulseArgs): void {
     }, durationMs + 80);
 }
 
+/** Performs clear HUD pulse timers. */
 export function clearHudPulseTimers(timers: HudPulseTimers): void {
     if (timers.scorePulseTimer) {
         clearTimeout(timers.scorePulseTimer);

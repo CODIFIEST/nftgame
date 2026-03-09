@@ -25,10 +25,10 @@
     .start-card {
         width: min(420px, 90vw);
         border-radius: 14px;
-        border: 1px solid rgba(255, 255, 255, 0.22);
+        border: 1px solid var(--theme-border);
         background: linear-gradient(165deg, rgba(20, 32, 55, 0.98), rgba(8, 14, 28, 0.95));
         padding: 20px;
-        color: #eaf2ff;
+        color: var(--theme-text);
         text-align: center;
         display: grid;
         gap: 8px;
@@ -36,7 +36,7 @@
 
     .start-card h2 {
         margin: 0;
-        color: #ffedc6;
+        color: var(--theme-accent);
     }
 
     .start-card p {
@@ -44,7 +44,7 @@
     }
 
     .help {
-        color: #a9c2e3;
+        color: var(--theme-muted);
         font-size: 13px;
     }
 

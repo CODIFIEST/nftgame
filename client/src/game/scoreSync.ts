@@ -1,5 +1,6 @@
 import { trackInfo, trackWarn } from "./telemetry.js";
 
+/** Type definition for score payload. */
 export type ScorePayload = {
     token: string;
     imageURL: string;
@@ -15,11 +16,13 @@ export type ScorePayload = {
     createdAt?: string;
 };
 
+/** Type definition for post score fn. */
 type PostScoreFn = (payload: ScorePayload, timeoutMs: number) => Promise<void>;
 
 const DEFAULT_QUEUE_KEY = "nftgame.pendingScores";
 const DEFAULT_LAST_SYNC_KEY = "nftgame.lastScoreSyncAt";
 
+/** Performs dedupe key. */
 function dedupeKey(payload: ScorePayload): string {
     return [
         payload.ticketId || "ticketless",
@@ -33,10 +36,12 @@ function dedupeKey(payload: ScorePayload): string {
     ].join("|");
 }
 
+/** Performs wait. */
 function wait(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Reads HTTP status. */
 function readHttpStatus(error: unknown): number | null {
     if (!error || typeof error !== "object") {
         return null;
@@ -45,6 +50,7 @@ function readHttpStatus(error: unknown): number | null {
     return typeof candidate === "number" ? candidate : null;
 }
 
+/** Returns whether is retryable score error. */
 export function isRetryableScoreError(error: unknown): boolean {
     const status = readHttpStatus(error);
     if (status === null) {

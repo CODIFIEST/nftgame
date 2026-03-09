@@ -1,6 +1,7 @@
 import { GAME_CONTAINER_ID, GAME_HEIGHT, GAME_WIDTH } from "./constants";
 import type { LevelConfig } from "./levels";
 
+/** Type definition for sanity snapshot. */
 type SanitySnapshot = {
     playerName: string | null | undefined;
     hasPlayerImage: boolean;
@@ -9,6 +10,7 @@ type SanitySnapshot = {
     highScoreValue: number;
 };
 
+/** Performs run sanity checks. */
 export function runSanityChecks(levels: LevelConfig[], snapshot: SanitySnapshot): void {
     console.group("[GameDebug] Sanity checks");
     console.assert(Array.isArray(levels) && levels.length > 0, "LEVELS config missing");

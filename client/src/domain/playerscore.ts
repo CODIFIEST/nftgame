@@ -1,3 +1,4 @@
+/** Type definition for player score. */
 type PlayerScore ={
     token:string,
     score:number,

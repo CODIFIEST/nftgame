@@ -2,14 +2,86 @@ import type * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "./constants";
 import type { PlatformConfig } from "./levels";
 
+/** Convenience alias for the static platform group used by Arcade physics. */
 type PlatformGroup = Phaser.Physics.Arcade.StaticGroup | undefined;
+/** Convenience alias for an Arcade image object. */
 type ArcadeImage = Phaser.Physics.Arcade.Image;
+/** Optional player sprite reference used during level transitions. */
 type PlayerSprite = Phaser.Physics.Arcade.Sprite | undefined;
 
-function platformTargetsForLayout(layout: PlatformConfig[]): PlatformConfig[] {
-    return [{ x: GAME_WIDTH / 2, y: GAME_HEIGHT - 10, scaleX: 4 }, ...layout];
+const GROUND_TEXTURE_KEY = "ground";
+const FLOOR_OVERHANG_PX = 120;
+const MIN_PLATFORM_WIDTH_PX = 48;
+const PLATFORM_WIDTH_QUANTIZE_PX = 8;
+
+/** Reads the base ground texture dimensions in pixels. */
+function baseGroundSize(scene: Phaser.Scene): { width: number; height: number } {
+    const source = scene.textures.get(GROUND_TEXTURE_KEY).getSourceImage() as { width?: number; height?: number };
+    return {
+        width: Math.max(1, source?.width ?? 256),
+        height: Math.max(1, source?.height ?? 52),
+    };
 }
 
+/** Snaps widths to a small grid so texture variants can be reused. */
+function quantizeWidth(width: number): number {
+    return Math.max(
+        MIN_PLATFORM_WIDTH_PX,
+        Math.round(width / PLATFORM_WIDTH_QUANTIZE_PX) * PLATFORM_WIDTH_QUANTIZE_PX,
+    );
+}
+
+/** Creates or reuses a tiled ground texture variant for the requested width. */
+function ensureGroundWidthVariant(scene: Phaser.Scene, targetWidth: number): string {
+    const { width: baseWidth, height: baseHeight } = baseGroundSize(scene);
+    const finalWidth = quantizeWidth(targetWidth);
+    if (Math.abs(finalWidth - baseWidth) <= PLATFORM_WIDTH_QUANTIZE_PX) {
+        return GROUND_TEXTURE_KEY;
+    }
+
+    const key = `${GROUND_TEXTURE_KEY}-w-${finalWidth}`;
+    if (scene.textures.exists(key)) {
+        return key;
+    }
+
+    const sourceImage = scene.textures.get(GROUND_TEXTURE_KEY).getSourceImage() as HTMLCanvasElement | HTMLImageElement;
+    const variant = scene.textures.createCanvas(key, finalWidth, baseHeight);
+    const ctx = variant.context;
+    ctx.clearRect(0, 0, finalWidth, baseHeight);
+
+    for (let x = 0; x < finalWidth; x += baseWidth) {
+        const sliceWidth = Math.min(baseWidth, finalWidth - x);
+        ctx.drawImage(sourceImage, 0, 0, sliceWidth, baseHeight, x, 0, sliceWidth, baseHeight);
+    }
+    variant.refresh();
+    return key;
+}
+
+/** Applies width-specific texture sizing and refreshes the static body. */
+function applyPlatformWidth(scene: Phaser.Scene, platform: ArcadeImage, scaleX = 1): void {
+    const { width: baseWidth, height: baseHeight } = baseGroundSize(scene);
+    const desiredWidth = Math.max(MIN_PLATFORM_WIDTH_PX, baseWidth * (scaleX ?? 1));
+    const textureKey = ensureGroundWidthVariant(scene, desiredWidth);
+    const finalWidth = textureKey === GROUND_TEXTURE_KEY ? baseWidth : Number(textureKey.split("-w-")[1] ?? baseWidth);
+
+    platform.setTexture(textureKey);
+    platform.setDisplaySize(finalWidth, baseHeight);
+    platform.setScale(1, 1);
+    platform.refreshBody();
+}
+
+/** Calculates floor scale so the base floor reaches past both viewport edges. */
+function floorScaleX(scene: Phaser.Scene): number {
+    const { width: baseWidth } = baseGroundSize(scene);
+    return (GAME_WIDTH + FLOOR_OVERHANG_PX * 2) / baseWidth;
+}
+
+/** Builds tween targets that include floor plus all level layout platforms. */
+function platformTargetsForLayout(scene: Phaser.Scene, layout: PlatformConfig[]): PlatformConfig[] {
+    return [{ x: GAME_WIDTH / 2, y: GAME_HEIGHT - 10, scaleX: floorScaleX(scene) }, ...layout];
+}
+
+/** Creates floor and level platforms immediately for a new layout. */
 export function buildPlatforms(
     scene: Phaser.Scene,
     platforms: PlatformGroup,
@@ -19,17 +91,17 @@ export function buildPlatforms(
     if (platforms) {
         nextPlatforms.clear(true, true);
     }
-    nextPlatforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, "ground").setScale(4, 1).refreshBody();
+    const floor = nextPlatforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, GROUND_TEXTURE_KEY) as ArcadeImage;
+    applyPlatformWidth(scene, floor, floorScaleX(scene));
 
     layout.forEach((piece) => {
-        const platform = nextPlatforms.create(piece.x, piece.y, "ground");
-        if (piece.scaleX) {
-            platform.setScale(piece.scaleX, 1).refreshBody();
-        }
+        const platform = nextPlatforms.create(piece.x, piece.y, GROUND_TEXTURE_KEY) as ArcadeImage;
+        applyPlatformWidth(scene, platform, piece.scaleX ?? 1);
     });
     return nextPlatforms;
 }
 
+/** Tweens an existing platform set so it matches a new target layout. */
 export function animatePlatformsToLayout(
     scene: Phaser.Scene,
     platforms: PlatformGroup,
@@ -37,13 +109,13 @@ export function animatePlatformsToLayout(
     durationMs: number,
 ): Phaser.Physics.Arcade.StaticGroup {
     const nextPlatforms = platforms ?? buildPlatforms(scene, platforms, layout);
-    const targets = platformTargetsForLayout(layout);
+    const targets = platformTargetsForLayout(scene, layout);
     const current = nextPlatforms.getChildren() as ArcadeImage[];
 
     while (current.length < targets.length) {
         const target = targets[current.length];
-        const created = nextPlatforms.create(target.x, target.y, "ground") as ArcadeImage;
-        created.setScale(target.scaleX ?? 1, 1).refreshBody();
+        const created = nextPlatforms.create(target.x, target.y, GROUND_TEXTURE_KEY) as ArcadeImage;
+        applyPlatformWidth(scene, created, target.scaleX ?? 1);
         current.push(created);
     }
     while (current.length > targets.length) {
@@ -53,12 +125,11 @@ export function animatePlatformsToLayout(
 
     current.forEach((platform, index) => {
         const target = targets[index];
+        applyPlatformWidth(scene, platform, target.scaleX ?? 1);
         scene.tweens.add({
             targets: platform,
             x: target.x,
             y: target.y,
-            scaleX: target.scaleX ?? 1,
-            scaleY: 1,
             duration: durationMs,
             ease: "Sine.easeInOut",
             onUpdate: () => {
@@ -73,11 +144,13 @@ export function animatePlatformsToLayout(
     return nextPlatforms;
 }
 
+/** Returns total reveal time for sequential platform spawn animation. */
 export function sequentialRevealDurationMs(layoutLength: number): number {
     const intervalMs = 240;
     return Math.max(460, (layoutLength - 1) * intervalMs + 420);
 }
 
+/** Rebuilds platforms with a staggered reveal effect for level transitions. */
 export function buildPlatformsSequential(
     scene: Phaser.Scene,
     platforms: PlatformGroup,
@@ -91,10 +164,10 @@ export function buildPlatformsSequential(
     }
 
     const anchor = layout[0];
-    const ground = nextPlatforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, "ground");
-    ground.setScale(4, 1).refreshBody();
-    const anchorPlatform = nextPlatforms.create(anchor.x, anchor.y, "ground");
-    anchorPlatform.setScale(anchor.scaleX ?? 0.72, 1).refreshBody();
+    const ground = nextPlatforms.create(GAME_WIDTH / 2, GAME_HEIGHT - 10, GROUND_TEXTURE_KEY) as ArcadeImage;
+    applyPlatformWidth(scene, ground, floorScaleX(scene));
+    const anchorPlatform = nextPlatforms.create(anchor.x, anchor.y, GROUND_TEXTURE_KEY) as ArcadeImage;
+    applyPlatformWidth(scene, anchorPlatform, anchor.scaleX ?? 0.72);
 
     if (preservePlayerOnAnchor && player) {
         player.x = anchor.x;
@@ -113,8 +186,9 @@ export function buildPlatformsSequential(
     const intervalMs = 240;
     remaining.forEach((piece, idx) => {
         scene.time.delayedCall((idx + 1) * intervalMs, () => {
-            const platform = nextPlatforms.create(piece.x, piece.y + 18, "ground");
-            platform.setScale(piece.scaleX ?? 1, 1).setAlpha(0).refreshBody();
+            const platform = nextPlatforms.create(piece.x, piece.y + 18, GROUND_TEXTURE_KEY) as ArcadeImage;
+            applyPlatformWidth(scene, platform, piece.scaleX ?? 1);
+            platform.setAlpha(0).refreshBody();
             scene.tweens.add({
                 targets: platform,
                 y: piece.y,
@@ -130,6 +204,7 @@ export function buildPlatformsSequential(
     return { platforms: nextPlatforms, revealMs: sequentialRevealDurationMs(layout.length) };
 }
 
+/** Repositions the player above the first ledge for the active level. */
 export function placePlayerAtLevelStart(
     player: Phaser.Physics.Arcade.Sprite | undefined,
     layout: PlatformConfig[],
@@ -153,6 +228,7 @@ export function placePlayerAtLevelStart(
     });
 }
 
+/** Finds the closest ledge near the player's feet to use as an anchor point. */
 export function getCurrentAnchorLedge(
     player: Phaser.Physics.Arcade.Sprite | undefined,
     platforms: PlatformGroup,
@@ -176,6 +252,7 @@ export function getCurrentAnchorLedge(
     return { x: best?.x ?? player.x, y: best?.y ?? player.y + 90 };
 }
 
+/** Returns the best platform candidate currently under or near the player. */
 export function getCurrentAnchorPlatform(
     player: Phaser.Physics.Arcade.Sprite | undefined,
     platforms: PlatformGroup,

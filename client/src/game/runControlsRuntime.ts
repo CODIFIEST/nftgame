@@ -1,11 +1,13 @@
 import type * as Phaser from "phaser";
 import { handleRunTicketRequestError, markRunStarted, type RunSessionState } from "./runSession";
 
+/** Arguments for request run ticket. */
 type RequestRunTicketArgs = {
     requestRunTicket: () => Promise<void>;
     runSession: RunSessionState;
 };
 
+/** Arguments for begin run. */
 type BeginRunArgs = {
     sceneRef: Phaser.Scene | null;
     hasRunStarted: boolean;
@@ -19,6 +21,7 @@ type BeginRunArgs = {
     playTone: (frequency: number, durationMs: number, gain?: number, type?: OscillatorType) => void;
 };
 
+/** Arguments for toggle pause. */
 type TogglePauseArgs = {
     sceneRef: Phaser.Scene | null;
     hasRunStarted: boolean;
@@ -29,6 +32,7 @@ type TogglePauseArgs = {
     setIsPaused: (value: boolean) => void;
 };
 
+/** Arguments for keydown. */
 type KeydownArgs = {
     event: KeyboardEvent;
     showStartOverlay: boolean;
@@ -37,6 +41,7 @@ type KeydownArgs = {
     togglePause: () => void;
 };
 
+/** Requests run ticket with handling. */
 export async function requestRunTicketWithHandling(args: RequestRunTicketArgs): Promise<void> {
     try {
         await args.requestRunTicket();
@@ -49,6 +54,7 @@ export async function requestRunTicketWithHandling(args: RequestRunTicketArgs): 
     }
 }
 
+/** Starts run runtime. */
 export async function beginRunRuntime(args: BeginRunArgs): Promise<void> {
     if (!args.sceneRef || args.hasRunStarted || args.isDead) {
         return;
@@ -67,6 +73,7 @@ export async function beginRunRuntime(args: BeginRunArgs): Promise<void> {
     args.playTone(640, 100, 0.02, "triangle");
 }
 
+/** Toggles pause runtime. */
 export function togglePauseRuntime(args: TogglePauseArgs): void {
     if (!args.sceneRef || !args.hasRunStarted || args.isDead || args.showGameOver || args.isLevelTransitioning) {
         return;
@@ -80,6 +87,7 @@ export function togglePauseRuntime(args: TogglePauseArgs): void {
     }
 }
 
+/** Handles run control keydown. */
 export function handleRunControlKeydown(args: KeydownArgs): void {
     if (args.event.key === "Escape") {
         args.togglePause();

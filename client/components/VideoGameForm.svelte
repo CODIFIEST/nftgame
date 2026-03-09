@@ -6,6 +6,7 @@ let releaseYear:number=0;
 let genre:string="";
 let ESRBrating:string="";
 let goodGame:boolean=false;
+/** Performs submit form. */
 async function submitForm() {
    const result = await axios.post('http://localhost:3000/games', {
         name:name,

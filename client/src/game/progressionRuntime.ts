@@ -2,6 +2,7 @@ import type * as Phaser from "phaser";
 import { anchorXForLevel, type LevelConfig } from "./levels";
 import { sequentialRevealDurationMs } from "./platformRuntime";
 
+/** Arguments for advance after clear. */
 type AdvanceAfterClearArgs = {
     scene: Phaser.Scene;
     level: number;
@@ -44,6 +45,7 @@ type AdvanceAfterClearArgs = {
     ) => void;
 };
 
+/** Advances after star clear. */
 export function advanceAfterStarClear(args: AdvanceAfterClearArgs): void {
     if (args.isLevelTransitioning) {
         return;

@@ -11,11 +11,13 @@ import {
 } from "./constants";
 import type { LevelConfig } from "./levels";
 
+/** Type definition for bomb style. */
 export type BombStyle = {
     tint: number;
     scale: number;
 };
 
+/** Performs estimate max jump rise px. */
 export function estimateMaxJumpRisePx(): number {
     const dt = 1 / 120;
     let vy = JUMP_INITIAL_VELOCITY;
@@ -40,6 +42,7 @@ export function estimateMaxJumpRisePx(): number {
     return maxRise;
 }
 
+/** Performs verify all level first ledge reachability. */
 export function verifyAllLevelFirstLedgeReachability(scene: Phaser.Scene, levels: LevelConfig[]): void {
     const groundTexture = scene.textures.get("ground").getSourceImage() as { height?: number };
     const groundHeight = groundTexture?.height ?? 64;
@@ -67,6 +70,7 @@ export function verifyAllLevelFirstLedgeReachability(scene: Phaser.Scene, levels
     });
 }
 
+/** Performs center zoomed camera. */
 export function centerZoomedCamera(scene: Phaser.Scene) {
     const camera = scene.cameras.main;
     const visibleWidth = GAME_WIDTH / camera.zoom;
@@ -74,6 +78,7 @@ export function centerZoomedCamera(scene: Phaser.Scene) {
     camera.setScroll((GAME_WIDTH - visibleWidth) / 2, (GAME_HEIGHT - visibleHeight) / 2);
 }
 
+/** Performs background target position for level. */
 export function backgroundTargetPositionForLevel(levelNumber: number) {
     const sectionIndex = (levelNumber - 1) % (BACKGROUND_SECTION_GRID * BACKGROUND_SECTION_GRID);
     const rowFromBottom = Math.floor(sectionIndex / BACKGROUND_SECTION_GRID);
@@ -90,6 +95,7 @@ export function backgroundTargetPositionForLevel(levelNumber: number) {
     };
 }
 
+/** Performs bomb style for level. */
 export function bombStyleForLevel(currentLevel: number): BombStyle {
     const tier = Math.min(4, Math.floor((currentLevel - 1) / 20));
     const styles: BombStyle[] = [

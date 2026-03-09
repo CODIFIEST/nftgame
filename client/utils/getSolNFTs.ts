@@ -1,6 +1,7 @@
 import { NFTType, type NFT } from "../../server/domain/nft";
 import axios from "axios";
 
+/** Type definition for helius asset. */
 type HeliusAsset = {
     id?: string;
     grouping?: Array<{ group_key?: string; group_value?: string }>;
@@ -19,12 +20,14 @@ type HeliusAsset = {
     };
 };
 
+/** Type definition for helius response. */
 type HeliusResponse = {
     result?: {
         items?: HeliusAsset[];
     };
 };
 
+/** Type definition for quick node asset. */
 type QuickNodeAsset = {
     name?: string;
     description?: string;
@@ -34,6 +37,7 @@ type QuickNodeAsset = {
     tokenAddress?: string;
 };
 
+/** Type definition for quick node response. */
 type QuickNodeResponse = {
     result?: {
         totalPages?: number;
@@ -42,6 +46,7 @@ type QuickNodeResponse = {
     };
 };
 
+/** Resolves RPC URL. */
 function resolveRpcUrl(): string | null {
     const heliusApiKey = import.meta.env.VITE_HELIUS_API_KEY?.trim();
     if (heliusApiKey) {
@@ -61,6 +66,7 @@ function resolveRpcUrl(): string | null {
     return null;
 }
 
+/** Performs asset collection address. */
 function assetCollectionAddress(asset: HeliusAsset): string {
     const groupingCollection = asset.grouping?.find(
         (group) => group.group_key === "collection",
@@ -69,6 +75,7 @@ function assetCollectionAddress(asset: HeliusAsset): string {
     return (groupingCollection ?? asset.collection?.address ?? "").trim();
 }
 
+/** Performs asset image URL. */
 function assetImageUrl(asset: HeliusAsset): string {
     return (
         asset.content?.links?.image ??
@@ -78,6 +85,7 @@ function assetImageUrl(asset: HeliusAsset): string {
     );
 }
 
+/** Maps helius asset. */
 function mapHeliusAsset(asset: HeliusAsset, collectionAddress: string): NFT {
     return {
         title: asset.content?.metadata?.name ?? "",
@@ -89,6 +97,7 @@ function mapHeliusAsset(asset: HeliusAsset, collectionAddress: string): NFT {
     };
 }
 
+/** Maps quick node asset. */
 function mapQuickNodeAsset(asset: QuickNodeAsset, collectionAddress: string): NFT {
     return {
         title: asset.name ?? "",
@@ -100,6 +109,7 @@ function mapQuickNodeAsset(asset: QuickNodeAsset, collectionAddress: string): NF
     };
 }
 
+/** Performs fetch with helius. */
 async function fetchWithHelius(address: string, rpcUrl: string, collectionAddress: string): Promise<NFT[]> {
     const config = {
         headers: { "Content-Type": "application/json" },
@@ -141,6 +151,7 @@ async function fetchWithHelius(address: string, rpcUrl: string, collectionAddres
     return domainNFTs;
 }
 
+/** Performs fetch with quick node. */
 async function fetchWithQuickNode(address: string, rpcUrl: string, collectionAddress: string): Promise<NFT[]> {
     const config = {
         headers: { "Content-Type": "application/json" },
@@ -188,6 +199,7 @@ async function fetchWithQuickNode(address: string, rpcUrl: string, collectionAdd
     return domainNFTs;
 }
 
+/** Returns sol nf ts. */
 async function getSolNFTs(address: string): Promise<NFT[]> {
     const collectionAddress = import.meta.env.VITE_SOL_COLLECTION_ADDRESS?.trim();
     if (!collectionAddress) {

@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "./constants";
 import type { PlatformConfig } from "./levels";
 
+/** Arguments for reset stars. */
 type ResetStarsArgs = {
     scene: Phaser.Scene;
     stars: Phaser.Physics.Arcade.Group | undefined;
@@ -17,6 +18,7 @@ type ResetStarsArgs = {
     clamp: (value: number, min: number, max: number) => number;
 };
 
+/** Normalizes player sprite. */
 export function normalizePlayerSprite(player: Phaser.Physics.Arcade.Sprite, scene: Phaser.Scene): void {
     const dudeTexture = scene.textures.get("dude");
     const source = dudeTexture.getSourceImage() as { width?: number; height?: number };
@@ -44,6 +46,7 @@ export function normalizePlayerSprite(player: Phaser.Physics.Arcade.Sprite, scen
     });
 }
 
+/** Resets stars. */
 export function resetStars(args: ResetStarsArgs): Phaser.Physics.Arcade.Group {
     const { scene, platforms, player, collectStar, layout, totalStars, clamp } = args;
     const stars = args.stars ?? scene.physics.add.group();
@@ -75,6 +78,7 @@ export function resetStars(args: ResetStarsArgs): Phaser.Physics.Arcade.Group {
     return stars;
 }
 
+/** Performs level banner. */
 export function levelBanner(scene: Phaser.Scene, text: string): void {
     const flash = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xffffff, 0.22);
     flash.setBlendMode(Phaser.BlendModes.ADD);

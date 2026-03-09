@@ -1,5 +1,6 @@
 import type * as Phaser from "phaser";
 
+/** Calculates the next combo multiplier using combo timing rules. */
 export function nextComboMultiplier(
     nowMs: number,
     lastCollectAtMs: number,
@@ -13,10 +14,12 @@ export function nextComboMultiplier(
     return 1;
 }
 
+/** Returns score points awarded for the current combo multiplier. */
 export function pointsForCombo(combo: number): number {
     return 10 * combo;
 }
 
+/** Performs render star collect fx. */
 export function renderStarCollectFx(
     scene: Phaser.Scene,
     star: Phaser.Physics.Arcade.Image,

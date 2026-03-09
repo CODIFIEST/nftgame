@@ -1,11 +1,13 @@
 import type * as Phaser from "phaser";
 
+/** Arguments for select player sprite source. */
 type SelectPlayerSpriteSourceArgs = {
     persistedImage: string;
     currentObjectUrl: string | null;
     dataUrlToObjectUrl: (dataUrl: string) => string | null;
 };
 
+/** Performs select player sprite source. */
 export function selectPlayerSpriteSource(args: SelectPlayerSpriteSourceArgs): {
     selectedPlayerImage: string;
     runtimeSpriteObjectUrl: string | null;
@@ -26,6 +28,7 @@ export function selectPlayerSpriteSource(args: SelectPlayerSpriteSourceArgs): {
     return { selectedPlayerImage, runtimeSpriteObjectUrl };
 }
 
+/** Preloads core assets assets. */
 export function preloadCoreAssets(scene: Phaser.Scene, playerSpriteSrc: string): void {
     scene.load.image("sky", "./newsky.png");
     scene.load.image("ground", "./platform.png");

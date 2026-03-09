@@ -49,6 +49,7 @@
 <style>
     p {
         text-align: center;
+        color: var(--theme-muted);
     }
 
     .nft-title {
@@ -57,7 +58,7 @@
         font-size: clamp(28px, 6vw, 40px);
         font-weight: 700;
         line-height: 1.15;
-        color: #f3f7ff;
+        color: var(--theme-heading);
         text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
         word-break: break-word;
     }

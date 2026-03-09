@@ -1,3 +1,4 @@
+/** Transforms URLs. */
 function transformURLs(imageURL:string):string{
     if (imageURL.startsWith(`ipfs://`)) {
         // console.log(imageUrl)

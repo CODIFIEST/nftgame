@@ -4,6 +4,7 @@
     let name: string = "";
     let age: number = 0;
     let ethAddress: string = "";
+    /** Performs submit form. */
     async function submitForm() {
         console.log(name, age, ethAddress);
         const result = await axios.post("http://localhost:3000/user", {

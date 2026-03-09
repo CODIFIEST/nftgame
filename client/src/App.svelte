@@ -35,6 +35,7 @@
 
   $: isGameRoute = $location === "/game";
 
+  /** Performs attempt landscape lock. */
   async function attemptLandscapeLock() {
     if (typeof window === "undefined" || !isGameRoute) {
       return;
@@ -120,6 +121,7 @@
     }
   });
 
+  /** Toggles mute. */
   function toggleMute() {
     isMuted = !isMuted;
     if (backgroundAudio) {
@@ -203,6 +205,7 @@
     padding-right: calc(env(safe-area-inset-right) + 10px);
     box-sizing: border-box;
     text-align: center;
+    color: var(--theme-text);
   }
 
   .game-shell {
@@ -229,9 +232,9 @@
     top: 14px;
     right: 14px;
     z-index: 40;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    background: rgba(10, 20, 38, 0.82);
-    color: #f8fbff;
+    border: 1px solid var(--theme-border);
+    background: var(--theme-panel-strong);
+    color: var(--theme-button-text);
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 13px;

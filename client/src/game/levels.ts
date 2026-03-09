@@ -1,9 +1,11 @@
+/** Platform placement values for one ledge in a generated level layout. */
 export type PlatformConfig = {
     x: number;
     y: number;
     scaleX?: number;
 };
 
+/** Gameplay and visual settings for a single generated level. */
 export type LevelConfig = {
     title: string;
     tint: number;
@@ -21,37 +23,48 @@ const BASE_LEVEL_THEMES: Pick<LevelConfig, "title" | "tint">[] = [
     { title: "Core Breach", tint: 0xff8d8d },
 ];
 
+/** Lowest vertical position allowed for generated ledges. */
 export const LEVEL_MIN_Y = 460;
+/** Highest vertical position allowed for generated ledges. */
 export const LEVEL_MAX_Y = 860;
+/** Lowest allowed Y for an anchor ledge when transitioning levels. */
 export const ANCHOR_MIN_Y = 650;
+/** Highest allowed Y for an anchor ledge when transitioning levels. */
 export const ANCHOR_MAX_Y = 860;
 
+/** Clamps a number to the provided minimum and maximum range. */
 export function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
 }
 
+/** Maps a level number to its zig-zag traversal row index. */
 function rowIndexForLevel(levelNumber: number): number {
     return Math.floor((levelNumber - 1) / 5);
 }
 
+/** Returns whether this level row should progress left-to-right. */
 function movesRightForLevel(levelNumber: number): boolean {
     return rowIndexForLevel(levelNumber) % 2 === 0;
 }
 
+/** Returns the default horizontal anchor for the level row direction. */
 export function anchorXForLevel(levelNumber: number, gameWidth: number): number {
     return movesRightForLevel(levelNumber) ? 160 : gameWidth - 160;
 }
 
+/** Deterministic pseudo-random unit value for repeatable procedural layout. */
 function seededUnit(levelNumber: number, index: number, salt = 0): number {
     const seed = Math.sin((levelNumber + 1) * 9283 + (index + 1) * 1237 + salt * 313) * 43758.5453;
     return seed - Math.floor(seed);
 }
 
+/** Deterministic pseudo-random value constrained to the given numeric range. */
 function seededBetween(levelNumber: number, index: number, min: number, max: number, salt = 0): number {
     const u = seededUnit(levelNumber, index, salt);
     return min + (max - min) * u;
 }
 
+/** Picks a deterministic platform width scale for a level/index pair. */
 function randomLedgeScale(levelNumber: number, index: number, isAnchor = false): number {
     const r = seededUnit(levelNumber, index, 5);
     const min = isAnchor ? 0.56 : 0.34;
@@ -59,6 +72,7 @@ function randomLedgeScale(levelNumber: number, index: number, isAnchor = false):
     return min + (max - min) * r;
 }
 
+/** Builds a deterministic, reachable platform layout for one level number. */
 export function buildLayoutForLevel(levelNumber: number, gameWidth: number): PlatformConfig[] {
     const platformCount = 5 + Math.min(5, Math.floor(levelNumber / 12));
     const maxStepX = 410;
@@ -109,6 +123,7 @@ export function buildLayoutForLevel(levelNumber: number, gameWidth: number): Pla
     return layout;
 }
 
+/** Re-centers a generated layout around a chosen anchor ledge position. */
 export function buildLayoutFromAnchor(
     levelNumber: number,
     anchorX: number,
@@ -127,6 +142,7 @@ export function buildLayoutFromAnchor(
     }));
 }
 
+/** Generates level configs and layouts from level 1 through totalLevels. */
 export function buildLevels(totalLevels: number, gameWidth: number): LevelConfig[] {
     const levels: LevelConfig[] = [];
     for (let levelNumber = 1; levelNumber <= totalLevels; levelNumber += 1) {
@@ -142,4 +158,3 @@ export function buildLevels(totalLevels: number, gameWidth: number): LevelConfig
     }
     return levels;
 }
-

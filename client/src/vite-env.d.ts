@@ -1,6 +1,7 @@
 /// <reference types="svelte" />
 /// <reference types="vite/client" />
 
+/** Type definition for import meta env. */
 interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string;
     readonly VITE_HELIUS_API_KEY?: string;
@@ -9,6 +10,7 @@ interface ImportMetaEnv {
     readonly VITE_QUICKNODE_APK?: string;
 }
 
+/** Type definition for import meta. */
 interface ImportMeta {
     readonly env: ImportMetaEnv;
 }

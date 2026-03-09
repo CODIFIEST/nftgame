@@ -1,5 +1,6 @@
 import type * as Phaser from "phaser";
 
+/** Arguments for update player motion. */
 type UpdatePlayerMotionArgs = {
     player: Phaser.Physics.Arcade.Sprite;
     cursors: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -16,6 +17,7 @@ type UpdatePlayerMotionArgs = {
     jumpPressedLastFrame: boolean;
 };
 
+/** Updates player motion. */
 export function updatePlayerMotion(args: UpdatePlayerMotionArgs): {
     jumpHoldTimeMs: number;
     jumpPressedLastFrame: boolean;

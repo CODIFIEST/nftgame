@@ -1,11 +1,15 @@
+/** Shared constant for reduced motion key. */
 export const REDUCED_MOTION_KEY = "nftgame.reducedMotion";
+/** Shared constant for left handed key. */
 export const LEFT_HANDED_KEY = "nftgame.leftHandedControls";
 
+/** Type definition for gameplay preferences. */
 export type GameplayPreferences = {
     reducedMotion: boolean;
     leftHandedMobileControls: boolean;
 };
 
+/** Loads gameplay preferences. */
 export function loadGameplayPreferences(): GameplayPreferences {
     if (typeof window === "undefined") {
         return {
@@ -20,6 +24,7 @@ export function loadGameplayPreferences(): GameplayPreferences {
     };
 }
 
+/** Performs persist gameplay preferences. */
 export function persistGameplayPreferences(prefs: GameplayPreferences): void {
     if (typeof window === "undefined") {
         return;

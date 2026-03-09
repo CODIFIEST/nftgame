@@ -4,26 +4,43 @@
  
 </script>
 
-<div class="nft-list">
-            {#if $nfts}
-        <!-- {console.log("from displayNFTs.svelte ", $nfts)} -->
-        
-                    {#each $nfts as nft}
-                        {#if nft.imageURL}
-                            <div class="nft-column">
-                                <Nft {nft} />
-                            </div>
-                        {/if}
-                    {/each}
+<section class="display-shell">
+    <h1 class="display-title">Choose Your Panda</h1>
+    <div class="nft-list">
+        {#if $nfts}
+            {#each $nfts as nft}
+                {#if nft.imageURL}
+                    <div class="nft-column">
+                        <Nft {nft} />
+                    </div>
+                {/if}
+            {/each}
         {:else}
             Loading...
         {/if}
- 
-  </div>
+    </div>
+</section>
 
 
 
 <style>
+    .display-shell {
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 74px 0 14px;
+        color: var(--theme-text);
+    }
+
+    .display-title {
+        margin: 0 8px 10px;
+        font-size: clamp(26px, 4vw, 40px);
+        font-weight: 800;
+        line-height: 1.15;
+        color: var(--theme-heading);
+        text-align: center;
+    }
+
     .nft-list {
         width: 100%;
         display: flex;
@@ -31,7 +48,6 @@
         overflow-x: auto;
         overflow-y: hidden;
         padding: 12px 8px 18px;
-        box-sizing: border-box;
         scroll-snap-type: x mandatory;
         -webkit-overflow-scrolling: touch;
     }

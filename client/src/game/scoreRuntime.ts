@@ -3,11 +3,13 @@ import { buildScorePayload, ensureTicketForSubmissionOrFail, type RunSessionStat
 import { isRetryableScoreError, type ScorePayload, type ScoreSyncQueue } from "./scoreSync";
 import { trackInfo } from "./telemetry";
 
+/** Type definition for NFT like. */
 type NftLike = {
     tokenAddress?: string;
     imageURL?: string;
 };
 
+/** Arguments for flush pending scores. */
 type FlushPendingScoresArgs = {
     scoreQueue: ScoreSyncQueue;
     postScore: (payload: ScorePayload, timeoutMs: number) => Promise<void>;
@@ -16,6 +18,7 @@ type FlushPendingScoresArgs = {
     refreshPendingSyncCount: () => void;
 };
 
+/** Arguments for save score. */
 type SaveScoreArgs = {
     scoreQueue: ScoreSyncQueue;
     runSession: RunSessionState;
@@ -31,6 +34,7 @@ type SaveScoreArgs = {
     setScoreSaveError: (value: string) => void;
 };
 
+/** Posts score payload. */
 export async function postScorePayload(
     apiBaseUrl: string,
     payload: ScorePayload,
@@ -39,6 +43,7 @@ export async function postScorePayload(
     await axios.post(`${apiBaseUrl}/scores`, payload, { timeout: timeoutMs });
 }
 
+/** Reads score save error message. */
 export function readScoreSaveErrorMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
         const status = error.response?.status;
@@ -53,6 +58,7 @@ export function readScoreSaveErrorMessage(error: unknown): string {
     return "Score saved locally and will auto-sync when connection returns.";
 }
 
+/** Performs flush pending scores runtime. */
 export async function flushPendingScoresRuntime(args: FlushPendingScoresArgs): Promise<void> {
     const pending = args.scoreQueue.getPendingCount();
     if (pending === 0) {
@@ -65,6 +71,7 @@ export async function flushPendingScoresRuntime(args: FlushPendingScoresArgs): P
     trackInfo("pending_score_flush_completed", { remaining });
 }
 
+/** Saves score runtime. */
 export async function saveScoreRuntime(args: SaveScoreArgs): Promise<void> {
     args.setSubmittingScore(true);
     args.setScoreSaveError("");

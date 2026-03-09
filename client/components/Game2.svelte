@@ -27,12 +27,14 @@
       game = new Phaser.Game(gameConfig);
     });
     
+    /** Phaser lifecycle hook that preloads scene assets. */
     function preload() {
       this.load.image('invader', 'assets/invader.png');
       this.load.image('ship', 'assets/ship.png');
       this.load.image('bullet', 'assets/bullet.png');
     }
     
+    /** Phaser lifecycle hook that creates scene objects and physics. */
     function create() {
       this.ship = this.physics.add.sprite(400, 550, 'ship');
       this.ship.setCollideWorldBounds(true);
@@ -54,6 +56,7 @@
       this.spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     }
     
+    /** Phaser lifecycle hook that updates gameplay on every frame. */
     function update() {
       if (this.input.keyboard.checkDown(this.spacebar, 250)) {
         let bullet = this.bullets.get();

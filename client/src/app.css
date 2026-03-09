@@ -2,9 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --theme-font-family: "Trebuchet MS", "Lucida Sans Unicode", "Segoe UI", sans-serif;
+  --theme-text: #eef4ff;
+  --theme-heading: #ffffff;
+  --theme-muted: #c3d5ec;
+  --theme-panel: rgba(8, 16, 30, 0.62);
+  --theme-panel-strong: rgba(10, 20, 38, 0.84);
+  --theme-border: rgba(219, 234, 255, 0.24);
+  --theme-button-bg: rgba(13, 29, 56, 0.9);
+  --theme-button-text: #f8fbff;
+  --theme-accent: #ffd58f;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+}
+
 body {
   margin: 0;
-  background-color: #868080;
+  background-color: #0e1728;
+  color: var(--theme-text);
+  font-family: var(--theme-font-family);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--theme-heading);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 canvas {

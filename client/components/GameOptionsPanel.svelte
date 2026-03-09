@@ -22,11 +22,11 @@
         z-index: 25;
         display: grid;
         gap: 8px;
-        color: #e5efff;
+        color: var(--theme-text);
         font-size: 12px;
         font-weight: 600;
-        background: rgba(8, 17, 35, 0.86);
-        border: 1px solid rgba(194, 214, 255, 0.34);
+        background: var(--theme-panel-strong);
+        border: 1px solid var(--theme-border);
         border-radius: 10px;
         padding: 10px 12px;
     }

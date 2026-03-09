@@ -11,6 +11,7 @@
     let allTimeScores = [];
     let allTimeUnavailable = false;
 
+    /** Returns season scores. */
     async function getSeasonScores() {
         const result = await axios.get(`${API_BASE_URL}/scores`, {
             timeout: 10000,
@@ -22,11 +23,13 @@
         
     }
 
+    /** Returns all time scores. */
     async function getAllTimeScores() {
         const result = await axios.get(`${API_BASE_URL}/scores/all-time`, { timeout: 10000 });
         return result.data
     }
 
+    /** Returns top unique scores. */
     function getTopUniqueScores(scores: any[], targetSeason?: string) {
         const onthelist = [];
         const scoped = targetSeason
@@ -111,16 +114,16 @@
         font-weight: 700;
         line-height: 1.1;
         margin: 6px 0 8px 4px;
-        color: #f4f8ff;
-        -webkit-text-fill-color: #f4f8ff;
+        color: var(--theme-heading);
+        -webkit-text-fill-color: var(--theme-heading);
         text-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
     }
 
     .season-info {
         margin: 2px 0 8px 4px;
         font-size: 14px;
-        color: #dce7fb;
-        -webkit-text-fill-color: #dce7fb;
+        color: var(--theme-muted);
+        -webkit-text-fill-color: var(--theme-muted);
     }
 
     .leaderboard-scroll {
@@ -138,8 +141,8 @@
     .leaderboard-card {
         flex: 0 0 clamp(160px, 20vw, 220px);
         scroll-snap-align: start;
-        background: rgba(8, 16, 30, 0.62);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: var(--theme-panel);
+        border: 1px solid var(--theme-border);
         border-radius: 8px;
         overflow: hidden;
     }
@@ -157,8 +160,8 @@
         font-size: clamp(13px, 2.2vw, 16px);
         line-height: 1.25;
         word-break: break-word;
-        color: #f4f8ff;
-        -webkit-text-fill-color: #f4f8ff;
+        color: var(--theme-text);
+        -webkit-text-fill-color: var(--theme-text);
     }
 
     .leaderboard-meta {

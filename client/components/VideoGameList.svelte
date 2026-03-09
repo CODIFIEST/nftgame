@@ -2,6 +2,7 @@
     import axios from "axios";
     import { onMount } from "svelte";
     let games = [];
+    /** Returns games. */
     async function getGames() {
         const result = await axios.get("http://localhost:3000/games");
         console.log("results", result.data);

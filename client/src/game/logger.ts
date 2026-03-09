@@ -1,3 +1,4 @@
+/** Type definition for log level. */
 type LogLevel = "debug" | "info" | "warn" | "error" | "silent";
 
 const LOG_LEVEL_KEY = "nftgame.logLevel";
@@ -11,6 +12,7 @@ const LEVEL_WEIGHT: Record<LogLevel, number> = {
 
 const sampleCounts = new Map<string, number>();
 
+/** Performs current level. */
 function currentLevel(): LogLevel {
     if (typeof window !== "undefined") {
         const fromStorage = window.localStorage?.getItem(LOG_LEVEL_KEY);
@@ -27,10 +29,12 @@ function currentLevel(): LogLevel {
     return "info";
 }
 
+/** Returns whether should log. */
 function shouldLog(level: LogLevel): boolean {
     return LEVEL_WEIGHT[level] >= LEVEL_WEIGHT[currentLevel()];
 }
 
+/** Sets log level. */
 export function setLogLevel(level: LogLevel): void {
     if (typeof window === "undefined") {
         return;
@@ -38,6 +42,7 @@ export function setLogLevel(level: LogLevel): void {
     window.localStorage?.setItem(LOG_LEVEL_KEY, level);
 }
 
+/** Performs log debug. */
 export function logDebug(message: string, payload?: unknown): void {
     if (!shouldLog("debug")) {
         return;
@@ -49,6 +54,7 @@ export function logDebug(message: string, payload?: unknown): void {
     }
 }
 
+/** Performs log info. */
 export function logInfo(message: string, payload?: unknown): void {
     if (!shouldLog("info")) {
         return;
@@ -60,6 +66,7 @@ export function logInfo(message: string, payload?: unknown): void {
     }
 }
 
+/** Performs log warn. */
 export function logWarn(message: string, payload?: unknown): void {
     if (!shouldLog("warn")) {
         return;
@@ -71,6 +78,7 @@ export function logWarn(message: string, payload?: unknown): void {
     }
 }
 
+/** Performs log error. */
 export function logError(message: string, payload?: unknown): void {
     if (!shouldLog("error")) {
         return;
@@ -82,6 +90,7 @@ export function logError(message: string, payload?: unknown): void {
     }
 }
 
+/** Performs log info sampled. */
 export function logInfoSampled(
     key: string,
     message: string,
