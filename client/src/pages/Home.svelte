@@ -50,11 +50,13 @@
         />
         <button class="btn name-btn" on:click={submitName}>Let's Play!</button>
     </div>
-    <h1 class="title font-bold">Hello there</h1>
-    <p class="subtitle">
-        Pandas' last resort is the super secret kill switch embedded in the crane
-        core logic. Join in the great pizza wars against the maniacal cranes.
-    </p>
+    <div class="hero-copy">
+        <h1 class="title font-bold">Hello there</h1>
+        <p class="subtitle">
+            Pandas' last resort is the super secret kill switch embedded in the crane
+            core logic. Join in the great pizza wars against the maniacal cranes.
+        </p>
+    </div>
     <HighScoreList />
 </section>
 
@@ -83,6 +85,17 @@
     .name-btn {
         flex: 0 0 auto;
         white-space: nowrap;
+        color: #f8fbff;
+    }
+
+    .hero-copy {
+        margin: 4px auto 16px;
+        padding: 6px 12px 10px;
+        max-width: 760px;
+        border-radius: 12px;
+        background: rgba(6, 18, 34, 0.32);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(2px);
     }
 
     .title {
@@ -93,6 +106,7 @@
         letter-spacing: -0.02em;
         color: #f4f8ff;
         text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+        display: block;
     }
 
     .subtitle {
@@ -103,6 +117,7 @@
         color: #edf3ff;
         text-wrap: balance;
         text-shadow: 0 1px 10px rgba(0, 0, 0, 0.28);
+        display: block;
     }
 
     @media (max-width: 768px) {
@@ -125,6 +140,11 @@
         .subtitle {
             font-size: clamp(16px, 5.2vw, 23px);
             max-width: 33ch;
+        }
+
+        .hero-copy {
+            width: 100%;
+            padding: 8px 10px 10px;
         }
     }
 </style>
