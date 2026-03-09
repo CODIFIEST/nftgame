@@ -12,7 +12,6 @@
     let resumeAudioOnGesture: (() => void) | null = null;
     let onVisibilityChange: (() => void) | null = null;
     let isMuted = false;
-    let isPhantomBrowser = false;
 
     const routes = {
     // Exact path
@@ -56,7 +55,6 @@
 
   onMount(() => {
     assertGameRuntimeConfig();
-    isPhantomBrowser = /phantom/i.test(navigator.userAgent);
 
     const trackUrl = encodeURI("/audio/colder still OST thingie 2-23-2026.mp3");
     backgroundAudio = new Audio(trackUrl);
@@ -130,7 +128,7 @@
   }
 </script>
 
-<main class:phantom-browser={isPhantomBrowser}>
+<main>
   <button class="audio-toggle" on:click={toggleMute}>
     {isMuted ? "Unmute" : "Mute"}
   </button>

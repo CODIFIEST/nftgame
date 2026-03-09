@@ -14,13 +14,9 @@
 
 {#if nft.title}
 
-    <div >
-        
-        
+    <div>
         {#if nft.description}
-        <p class="mb-5">{truncateString(nft.description, 20)}</p> <br />
-        {:else}
-            <!-- <p>There is no description available</p> <br /> -->
+        <p class="mb-5">{truncateString(nft.description, 20)}</p>
         {/if}
        
         <h1 class="nft-title">{nft.title}</h1>
@@ -45,7 +41,7 @@
                 on:keypress={() => {
                     playerImage.set(transformURLs(nft.imageURL));
                 }}
-            /> <br />
+            />
         </div>
     </div>
 {/if}
@@ -69,6 +65,7 @@
     .the-NFT {
         display: flex;
         justify-content: center;
+        margin: 0 auto;
     }
 
     img {
@@ -79,9 +76,5 @@
         object-fit: cover;
         display: block;
         cursor: pointer;
-    }
-
-    .the-NFT {
-        margin: 0 auto;
     }
 </style>

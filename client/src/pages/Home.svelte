@@ -35,24 +35,25 @@
 </script>
 
 <section class="landing-shell">
-    <div class="name-row">
+    <div class="landing-form">
         <input
-            class="input name-input"
+            class="name-input"
             bind:value={$playerName}
             type="text"
             placeholder="Put your name here"
             maxlength="10"
+            autocomplete="off"
             on:keydown={async (event) => {
                 if (event.key === "Enter") {
                     await submitName();
                 }
             }}
         />
-        <button class="btn name-btn" on:click={submitName}>Let's Play!</button>
+        <button class="name-btn" on:click={submitName}>Let's Play!</button>
     </div>
-    <div class="hero-copy">
-        <h1 class="title font-bold">Hello there</h1>
-        <p class="subtitle">
+    <div class="hero-panel">
+        <h1 class="hero-title">Hello there</h1>
+        <p class="hero-subtitle">
             Pandas' last resort is the super secret kill switch embedded in the crane
             core logic. Join in the great pizza wars against the maniacal cranes.
         </p>
@@ -64,16 +65,17 @@
     .landing-shell {
         width: min(100%, 980px);
         margin: 0 auto;
-        padding: 68px 12px 16px;
+        padding: 72px 12px 14px;
         box-sizing: border-box;
-        overflow-x: clip;
+        overflow-x: hidden;
+        color: #eef4ff;
     }
 
-    .name-row {
+    .landing-form {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin-bottom: 14px;
+        margin-bottom: 10px;
         width: 100%;
         max-width: 100%;
     }
@@ -85,9 +87,15 @@
         max-width: 100%;
         min-height: 54px;
         box-sizing: border-box;
-        border: 1px solid rgba(255, 255, 255, 0.26);
-        background: rgba(244, 247, 253, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.32);
+        border-radius: 12px;
+        padding: 0 16px;
+        font-size: 18px;
+        background: rgba(244, 247, 253, 0.95);
         color: #0e1b2f;
+        -webkit-text-fill-color: #0e1b2f;
+        appearance: none;
+        -webkit-appearance: none;
     }
 
     .name-btn {
@@ -97,53 +105,62 @@
         width: auto;
         max-width: 100%;
         min-height: 54px;
+        padding: 0 20px;
+        border-radius: 12px;
         box-sizing: border-box;
-        border: 1px solid rgba(255, 255, 255, 0.24);
-        background: rgba(44, 52, 66, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(43, 51, 66, 0.96);
         font-weight: 700;
+        font-size: 22px;
+        line-height: 1;
+        -webkit-text-fill-color: #f8fbff;
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        text-align: center;
     }
 
-    .hero-copy {
+    .hero-panel {
         margin: 4px auto 16px;
-        padding: 6px 10px 8px;
+        padding: 6px 10px 10px;
         max-width: 760px;
         width: 100%;
         box-sizing: border-box;
-        overflow-wrap: anywhere;
-        border-radius: 10px;
-        background: rgba(6, 18, 34, 0.22);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(6, 18, 34, 0.28);
+        border: 1px solid rgba(255, 255, 255, 0.18);
     }
 
-    .title {
-        margin: 0 auto 6px;
-        max-width: 12ch;
+    .hero-title {
+        margin: 0 auto 4px;
+        max-width: 16ch;
         width: 100%;
         box-sizing: border-box;
-        font-size: clamp(30px, 4.6vw, 56px);
+        font-size: clamp(28px, 4.6vw, 52px);
+        font-weight: 800;
         line-height: 1.08;
         letter-spacing: -0.01em;
         color: #ffffff;
+        -webkit-text-fill-color: #ffffff;
         display: block;
-        overflow-wrap: anywhere;
-        word-break: break-word;
     }
 
-    .subtitle {
-        margin: 0 auto 12px;
-        font-size: clamp(15px, 1.35vw, 22px);
+    .hero-subtitle {
+        margin: 0 auto;
+        font-size: clamp(14px, 1.35vw, 21px);
         line-height: 1.34;
-        max-width: 48ch;
+        max-width: 42ch;
         width: 100%;
         box-sizing: border-box;
-        color: #f3f7ff;
+        color: #eef4ff;
+        -webkit-text-fill-color: #eef4ff;
         display: block;
         overflow-wrap: anywhere;
         word-break: break-word;
     }
 
     @media (max-width: 768px) {
-        .name-row {
+        .landing-form {
             display: grid;
             grid-template-columns: minmax(0, 1fr);
             gap: 8px;
@@ -154,64 +171,33 @@
         .name-input,
         .name-btn {
             width: 100%;
-            flex-basis: 100%;
+            flex: 1 1 100%;
             min-width: 0;
             max-width: 100%;
         }
 
-        .title {
-            font-size: clamp(28px, 8.2vw, 40px);
+        .name-input,
+        .name-btn {
+            min-height: 50px;
+            font-size: 16px;
+        }
+
+        .hero-title {
+            font-size: clamp(24px, 8.2vw, 36px);
             max-width: 100%;
             width: 100%;
         }
 
-        .subtitle {
-            font-size: clamp(13px, 3.8vw, 18px);
-            max-width: 34ch;
+        .hero-subtitle {
+            font-size: clamp(12px, 3.8vw, 16px);
+            max-width: 35ch;
             width: 100%;
         }
 
-        .hero-copy {
+        .hero-panel {
             width: 100%;
             max-width: 100%;
-            padding: 6px 8px 8px;
+            padding: 5px 8px 8px;
         }
-    }
-
-    :global(.phantom-browser) .landing-shell {
-        padding-top: 82px;
-    }
-
-    :global(.phantom-browser) .name-input {
-        background: #f4f6fb;
-        color: #10213b;
-        border-color: rgba(9, 26, 54, 0.28);
-    }
-
-    :global(.phantom-browser) .name-input::placeholder {
-        color: #5e6f88;
-        opacity: 1;
-    }
-
-    :global(.phantom-browser) .name-btn {
-        background: #2f3442;
-        color: #ffffff;
-        border-color: rgba(255, 255, 255, 0.34);
-        text-shadow: none;
-    }
-
-    :global(.phantom-browser) .hero-copy,
-    :global(.phantom-browser) .title,
-    :global(.phantom-browser) .subtitle,
-    :global(.phantom-browser) .name-btn {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
-
-    :global(.phantom-browser) .subtitle {
-        color: #eef4ff !important;
-        -webkit-text-fill-color: #eef4ff !important;
     }
 </style>

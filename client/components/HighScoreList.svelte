@@ -9,7 +9,6 @@
     const currentSeason = `${currentDate.getUTCFullYear()}-Q${Math.floor(currentDate.getUTCMonth() / 3) + 1}`;
     let seasonScores = [];
     let allTimeScores = [];
-    let allTimeFallbackUsed = false;
     let allTimeUnavailable = false;
 
     async function getSeasonScores() {
@@ -25,7 +24,6 @@
 
     async function getAllTimeScores() {
         const result = await axios.get(`${API_BASE_URL}/scores/all-time`, { timeout: 10000 });
-        allTimeFallbackUsed = false;
         return result.data
     }
 
@@ -68,19 +66,18 @@
                 message: error instanceof Error ? error.message : String(error),
             });
             allTimeScores = [];
-            allTimeFallbackUsed = false;
             allTimeUnavailable = true;
         }
 
     })
 
 </script>
-<p class="season-label text-secondary">Current Season: {currentSeason}</p>
+<p class="season-label">Current Season: {currentSeason}</p>
 <div class="leaderboard-scroll" aria-label="Current season leaderboard">
 {#each seasonScores as p1score}
-    <article class="leaderboard-card rounded-md">
+    <article class="leaderboard-card">
         <img src={p1score.imageURL} alt="super panda" class="leaderboard-image">
-        <p class="leaderboard-text text-secondary">
+        <p class="leaderboard-text">
             <span class="leaderboard-meta">Name:</span> {p1score.playerName}
             <br>
             <span class="leaderboard-meta">Score:</span> {p1score.score}
@@ -90,18 +87,15 @@
 {/each}
 </div>
 
-<p class="season-label text-secondary">All-Time Highscores</p>
-{#if allTimeFallbackUsed}
-    <p class="season-label text-secondary">(fallback view: current season data)</p>
-{/if}
+<p class="season-label">All-Time Highscores</p>
 {#if allTimeUnavailable}
-    <p class="season-label text-secondary">(all-time leaderboard unavailable)</p>
+    <p class="season-info">(all-time leaderboard unavailable)</p>
 {/if}
 <div class="leaderboard-scroll" aria-label="All-time leaderboard">
 {#each allTimeScores as p1score}
-    <article class="leaderboard-card rounded-md">
+    <article class="leaderboard-card">
         <img src={p1score.imageURL} alt="super panda" class="leaderboard-image">
-        <p class="leaderboard-text text-secondary">
+        <p class="leaderboard-text">
             <span class="leaderboard-meta">Name:</span> {p1score.playerName}
             <br>
             <span class="leaderboard-meta">Score:</span> {p1score.score}
@@ -113,11 +107,20 @@
 
 <style>
     .season-label {
-        font-size: clamp(22px, 2.4vw, 34px);
+        font-size: clamp(20px, 2.2vw, 30px);
         font-weight: 700;
         line-height: 1.1;
         margin: 6px 0 8px 4px;
-        text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+        color: #f4f8ff;
+        -webkit-text-fill-color: #f4f8ff;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
+    }
+
+    .season-info {
+        margin: 2px 0 8px 4px;
+        font-size: 14px;
+        color: #dce7fb;
+        -webkit-text-fill-color: #dce7fb;
     }
 
     .leaderboard-scroll {
@@ -133,10 +136,11 @@
     }
 
     .leaderboard-card {
-        flex: 0 0 clamp(170px, 22vw, 240px);
+        flex: 0 0 clamp(160px, 20vw, 220px);
         scroll-snap-align: start;
-        background: rgba(0, 0, 0, 0.38);
+        background: rgba(8, 16, 30, 0.62);
         border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
         overflow: hidden;
     }
 
@@ -153,6 +157,8 @@
         font-size: clamp(13px, 2.2vw, 16px);
         line-height: 1.25;
         word-break: break-word;
+        color: #f4f8ff;
+        -webkit-text-fill-color: #f4f8ff;
     }
 
     .leaderboard-meta {
@@ -161,16 +167,16 @@
 
     @media (max-width: 768px) {
         .season-label {
-            font-size: clamp(18px, 5vw, 24px);
+            font-size: clamp(16px, 4.8vw, 22px);
             margin: 4px 0 6px 2px;
         }
 
         .leaderboard-card {
-            flex-basis: clamp(136px, 38vw, 176px);
+            flex-basis: clamp(122px, 34vw, 164px);
         }
 
         .leaderboard-text {
-            font-size: clamp(12px, 3.2vw, 14px);
+            font-size: clamp(11px, 3vw, 13px);
             padding: 4px 6px 6px;
         }
     }
