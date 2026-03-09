@@ -133,15 +133,15 @@
     {isMuted ? "Unmute" : "Mute"}
   </button>
   <div
-    class="hero min-h-screen"
+    class:landing-shell={!isGameRoute}
     class:game-shell={isGameRoute}
     style={!isGameRoute ? "background-image: url('https://www.arweave.net/hNN-l4QsOuWIRWwpOn-VDjso2NsGBW3Mg30p18Gs6zQ?ext=png')" : ""}
   >
     {#if !isGameRoute}
-      <div class="hero-overlay bg-opacity-60" />
+      <div class="landing-overlay" />
     {/if}
-    <div class:hero-content={!isGameRoute} class:landing-content={!isGameRoute} class:game-content={isGameRoute} class:text-center={!isGameRoute}>
-      <div class={isGameRoute ? "w-full" : "w-full max-w-7xl"}>
+    <div class:landing-content={!isGameRoute} class:game-content={isGameRoute}>
+      <div class={isGameRoute ? "w-full" : "landing-route"}>
         <Router {routes} />
       </div>
     </div>
@@ -150,13 +150,59 @@
 </main>
 
 <style>
+  :global(html),
+  :global(body),
+  :global(#app) {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
   main {
     width: 100%;
     overflow-x: hidden;
   }
 
-  :global(body) {
-    overflow-x: hidden;
+  .landing-shell {
+    position: relative;
+    width: 100%;
+    min-height: 100dvh;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+  }
+
+  .landing-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 16, 28, 0.44);
+    pointer-events: none;
+  }
+
+  .landing-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
+  }
+
+  .landing-route {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin: 0 auto;
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-left: calc(env(safe-area-inset-left) + 10px);
+    padding-right: calc(env(safe-area-inset-right) + 10px);
+    box-sizing: border-box;
+    text-align: center;
   }
 
   .game-shell {
@@ -199,19 +245,6 @@
     height: 100%;
   }
 
-  .landing-content {
-    width: 100%;
-    box-sizing: border-box;
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  .landing-content > .w-full {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   @media (max-width: 768px) {
     .audio-toggle {
       top: 10px;
@@ -220,9 +253,11 @@
       font-size: 12px;
     }
 
-    .landing-content {
-      padding-left: 0;
-      padding-right: 0;
+    .landing-route {
+      padding-left: 6px;
+      padding-right: 6px;
+      padding-left: calc(env(safe-area-inset-left) + 6px);
+      padding-right: calc(env(safe-area-inset-right) + 6px);
     }
   }
 </style>

@@ -63,7 +63,9 @@
 
 <style>
     .landing-shell {
-        width: min(100%, 980px);
+        width: 100%;
+        max-width: 980px;
+        min-width: 0;
         margin: 0 auto;
         padding: 72px 12px 14px;
         box-sizing: border-box;
