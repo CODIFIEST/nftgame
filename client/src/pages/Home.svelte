@@ -101,6 +101,9 @@
     .name-btn {
         flex: 0 0 auto;
         white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         color: #f8fbff;
         width: auto;
         max-width: 100%;

@@ -140,8 +140,8 @@
     {#if !isGameRoute}
       <div class="hero-overlay bg-opacity-60" />
     {/if}
-    <div class:hero-content={!isGameRoute} class:game-content={isGameRoute} class:text-center={!isGameRoute}>
-      <div class={isGameRoute ? "w-full" : "max-w-7xl"}>
+    <div class:hero-content={!isGameRoute} class:landing-content={!isGameRoute} class:game-content={isGameRoute} class:text-center={!isGameRoute}>
+      <div class={isGameRoute ? "w-full" : "w-full max-w-7xl"}>
         <Router {routes} />
       </div>
     </div>
@@ -199,12 +199,30 @@
     height: 100%;
   }
 
+  .landing-content {
+    width: 100%;
+    box-sizing: border-box;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .landing-content > .w-full {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
   @media (max-width: 768px) {
     .audio-toggle {
       top: 10px;
       right: 10px;
       padding: 8px 10px;
       font-size: 12px;
+    }
+
+    .landing-content {
+      padding-left: 0;
+      padding-right: 0;
     }
   }
 </style>
